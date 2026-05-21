@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>マーチャオ三麻スコア卓</title>
+    <link rel="stylesheet" href="./styles.css?v=center-down-20" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">3人麻雀 / 112牌</p>
+          <h1>マーチャオ三麻スコア卓</h1>
+        </div>
+        <div class="header-actions">
+          <button class="ghost-button" id="undoButton" type="button" title="直前の局を取り消す">↶</button>
+          <button class="ghost-button" id="resetButton" type="button">リセット</button>
+        </div>
+      </header>
+
+      <section class="battle-table tool-panel" id="battleTable" aria-label="麻雀対局画面">
+        <div class="battle-surface">
+          <div class="table-vignette" aria-hidden="true"></div>
+
+          <div class="opponent-hand opponent-left" aria-label="上家の手牌">
+            <div class="opponent-name" id="battleLeftName">上家</div>
+            <div class="side-hand" id="battleLeftHand"></div>
+            <div class="side-flower-lane" id="battleLeftFlowers"></div>
+          </div>
+
+          <div class="opponent-hand opponent-right" aria-label="下家の手牌">
+            <div class="opponent-name" id="battleRightName">下家</div>
+            <div class="side-hand" id="battleRightHand"></div>
+            <div class="side-flower-lane" id="battleRightFlowers"></div>
+          </div>
+
+          <div class="center-table-layout">
+          <div class="dora-indicator-row" id="battleDoraIndicators"></div>
+          <div class="center-tableau">
+            <div class="center-row">
+              <span id="battleRoundLabel">東1局0本場</span>
+              <strong id="battleRemainingDraws">残りツモ 37</strong>
+            </div>
+            <div class="central-score-grid" id="battlePlayerScores"></div>
+            <div class="flower-zone">
+              <span>華牌</span>
+              <div class="mini-tile-row" id="battleFlowerTiles"></div>
+            </div>
+            <div class="center-row table-meta">
+              <span id="battleDealerLabel">親 Player 1</span>
+              <span id="battleKyotakuLabel">供託0</span>
+            </div>
+            <div class="battle-actions">
+              <button class="primary-button battle-start-button" id="battleStartButton" type="button">対局開始</button>
+              <span id="battleStatus">待機中</span>
+            </div>
+          </div>
+
+          <div class="discard-river river-self" id="battleSelfRiver" aria-label="自分の捨て牌"></div>
+          <div class="discard-river river-left" id="battleLeftRiver" aria-label="上家の捨て牌"></div>
+          <div class="discard-river river-right" id="battleRightRiver" aria-label="下家の捨て牌"></div>
+          </div>
+
+          <div class="self-flower-lane" id="battleSelfFlowers" aria-label="自分の華牌"></div>
+          <div class="self-hand-area">
+            <div class="self-name" id="battleSelfName">自分</div>
+            <div class="self-hand" id="battleSelfHand" aria-label="自分の手牌"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scoreboard" aria-label="プレイヤー別スコア">
+        <article class="player-panel" data-player-card="0">
+          <div class="seat-chip">東</div>
+          <label>
+            <span>プレイヤー</span>
+            <input id="playerName0" type="text" value="Player 1" />
+          </label>
+          <label>
+            <span>持ち点</span>
+            <input id="playerScore0" type="number" step="100" value="35000" />
+          </label>
+          <div class="player-metrics">
+            <div>
+              <span>祝儀</span>
+              <strong id="bonus0">0</strong>
+            </div>
+            <div>
+              <span>トビ賞</span>
+              <strong id="tobi0">0</strong>
+            </div>
+            <div>
+              <span>リーチ</span>
+              <button class="mini-button" data-riichi-button="0" type="button">成立</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="player-panel" data-player-card="1">
+          <div class="seat-chip">南</div>
+          <label>
+            <span>プレイヤー</span>
+            <input id="playerName1" type="text" value="Player 2" />
+          </label>
+          <label>
+            <span>持ち点</span>
+            <input id="playerScore1" type="number" step="100" value="35000" />
+          </label>
+          <div class="player-metrics">
+            <div>
+              <span>祝儀</span>
+              <strong id="bonus1">0</strong>
+            </div>
+            <div>
+              <span>トビ賞</span>
+              <strong id="tobi1">0</strong>
+            </div>
+            <div>
+              <span>リーチ</span>
+              <button class="mini-button" data-riichi-button="1" type="button">成立</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="player-panel" data-player-card="2">
+          <div class="seat-chip">西</div>
+          <label>
+            <span>プレイヤー</span>
+            <input id="playerName2" type="text" value="Player 3" />
+          </label>
+          <label>
+            <span>持ち点</span>
+            <input id="playerScore2" type="number" step="100" value="35000" />
+          </label>
+          <div class="player-metrics">
+            <div>
+              <span>祝儀</span>
+              <strong id="bonus2">0</strong>
+            </div>
+            <div>
+              <span>トビ賞</span>
+              <strong id="tobi2">0</strong>
+            </div>
+            <div>
+              <span>リーチ</span>
+              <button class="mini-button" data-riichi-button="2" type="button">成立</button>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="workbench">
+        <form class="tool-panel" id="handForm">
+          <div class="panel-title">
+            <h2>局入力</h2>
+            <p id="paymentPreview">条件を入れると支払いが出ます</p>
+          </div>
+          <div class="round-strip" id="roundStatus"></div>
+
+          <div class="form-grid">
+            <label id="dealerField" hidden>
+              <span>現在の親（東家）</span>
+              <select id="dealerSelect"></select>
+            </label>
+            <label id="honbaField" hidden>
+              <span>本場</span>
+              <input id="honbaInput" type="number" min="0" max="99" value="0" />
+            </label>
+            <label id="resultTypeField">
+              <span>局の終了内容</span>
+              <select id="winType">
+                <option value="tsumo">ツモアガリ</option>
+                <option value="ron">ロンアガリ</option>
+                <option value="doubleRon">ダブロン</option>
+                <option value="draw">流局</option>
+              </select>
+            </label>
+            <label id="hanField">
+              <span>ハン数</span>
+              <input id="hanInput" type="number" min="1" max="59" value="4" />
+            </label>
+            <label id="winnerField">
+              <span>アガリ者</span>
+              <select id="winnerSelect"></select>
+            </label>
+            <label id="secondWinnerField" hidden>
+              <span>アガリ者2</span>
+              <select id="secondWinnerSelect"></select>
+            </label>
+            <label id="discarderField">
+              <span>放銃者</span>
+              <select id="discarderSelect"></select>
+            </label>
+            <label id="dealerTenpaiField" hidden>
+              <span>流局時の親</span>
+              <select id="dealerTenpaiSelect">
+                <option value="tenpai">聴牌</option>
+                <option value="noten">ノーテン</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="toggle-row" id="tenpaiRow" aria-label="流局時の聴牌者" hidden>
+            <label><input data-tenpai-input="0" type="checkbox" /> <span id="tenpaiLabel0">Player 1 聴牌</span></label>
+            <label><input data-tenpai-input="1" type="checkbox" /> <span id="tenpaiLabel1">Player 2 聴牌</span></label>
+            <label><input data-tenpai-input="2" type="checkbox" /> <span id="tenpaiLabel2">Player 3 聴牌</span></label>
+          </div>
+
+          <div class="double-ron-grid" id="doubleRonPanel" hidden>
+            <section class="win-detail-panel" aria-labelledby="shimochaWinnerLabel">
+              <div class="win-detail-title">
+                <span>下家のアガリ</span>
+                <strong id="shimochaWinnerLabel">下家</strong>
+              </div>
+              <label>
+                <span>ハン数</span>
+                <input id="shimochaHanInput" type="number" min="1" max="59" value="4" />
+              </label>
+              <div class="toggle-row compact-toggle-row" aria-label="下家の祝儀">
+                <label><input id="shimochaIppatsuInput" type="checkbox" /> 一発</label>
+                <label><input id="shimochaBlueSouInput" type="checkbox" /> 青5索</label>
+                <label><input id="shimochaBluePinInput" type="checkbox" /> 青5筒</label>
+                <label><input id="shimochaBlueFlowerInput" type="checkbox" /> 青華</label>
+                <label class="compact-number">
+                  <span>裏ドラ</span>
+                  <input id="shimochaUraInput" type="number" min="0" max="99" value="0" />
+                </label>
+              </div>
+            </section>
+
+            <section class="win-detail-panel" aria-labelledby="kamichaWinnerLabel">
+              <div class="win-detail-title">
+                <span>上家のアガリ</span>
+                <strong id="kamichaWinnerLabel">上家</strong>
+              </div>
+              <label>
+                <span>ハン数</span>
+                <input id="kamichaHanInput" type="number" min="1" max="59" value="4" />
+              </label>
+              <div class="toggle-row compact-toggle-row" aria-label="上家の祝儀">
+                <label><input id="kamichaIppatsuInput" type="checkbox" /> 一発</label>
+                <label><input id="kamichaBlueSouInput" type="checkbox" /> 青5索</label>
+                <label><input id="kamichaBluePinInput" type="checkbox" /> 青5筒</label>
+                <label><input id="kamichaBlueFlowerInput" type="checkbox" /> 青華</label>
+                <label class="compact-number">
+                  <span>裏ドラ</span>
+                  <input id="kamichaUraInput" type="number" min="0" max="99" value="0" />
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <div class="toggle-row" id="bonusRow" aria-label="祝儀">
+            <label><input id="ippatsuInput" type="checkbox" /> 一発</label>
+            <label><input id="blueSouInput" type="checkbox" /> 青5索</label>
+            <label><input id="bluePinInput" type="checkbox" /> 青5筒</label>
+            <label><input id="blueFlowerInput" type="checkbox" /> 青華</label>
+            <label class="compact-number">
+              <span>裏ドラ</span>
+              <input id="uraInput" type="number" min="0" max="99" value="0" />
+            </label>
+          </div>
+
+          <div class="form-grid" id="oorasuActionField" hidden>
+            <label>
+              <span>オーラス親連荘時</span>
+              <select id="oorasuActionSelect">
+                <option value="continue">続行</option>
+                <option value="end">終了</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="action-row">
+            <button class="primary-button" id="recordButton" type="submit">局を記録</button>
+          </div>
+        </form>
+
+        <section class="tool-panel final-panel">
+          <div class="panel-title">
+            <h2>半荘精算</h2>
+            <p>順位ポイント + 祝儀 + トビ賞</p>
+          </div>
+          <div class="form-grid" id="settlementControls" hidden>
+            <label>
+              <span>終了形</span>
+              <select id="finishType">
+                <option value="singleTsumo">1名ツモ</option>
+                <option value="singleRon">1名ロン</option>
+                <option value="doubleRon">2名ロン</option>
+                <option value="oneTenpai">1名聴牌流局</option>
+                <option value="twoTenpai">2名聴牌流局</option>
+              </select>
+            </label>
+            <label>
+              <span>トビ賞獲得者</span>
+              <select id="finishWinnerSelect"></select>
+            </label>
+          </div>
+          <div class="settlement-list" id="settlementList"></div>
+        </section>
+      </section>
+
+      <section class="details-grid">
+        <section class="tile-wall tool-panel">
+          <div class="panel-title">
+            <h2>使用牌</h2>
+            <p id="tileCount">112枚</p>
+          </div>
+          <div class="tile-groups" id="tileGroups"></div>
+        </section>
+
+        <section class="tool-panel history-panel">
+          <div class="panel-title">
+            <h2>局ログ</h2>
+            <p id="historyCount">0局</p>
+          </div>
+          <ol class="history-list" id="historyList"></ol>
+        </section>
+      </section>
+    </main>
+
+    <script src="./tiles.js"></script>
+    <script src="./game.js"></script>
+    <script src="./rules.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
