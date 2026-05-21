@@ -1280,14 +1280,14 @@ input[type="checkbox"] {
 
 .kamicha-score {
   left: 24px;
-  top: 50%;
+  top: calc(50% - var(--center-river-tile-long));
   transform-origin: left center;
   transform: translateY(-50%) rotate(90deg);
 }
 
 .shimocha-score {
   right: 24px;
-  top: 50%;
+  top: calc(50% - var(--center-river-tile-long));
   transform-origin: right center;
   transform: translateY(-50%) rotate(-90deg);
 }
