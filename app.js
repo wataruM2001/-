@@ -29,6 +29,7 @@
     battleLeftName: document.getElementById("battleLeftName"),
     battleRightName: document.getElementById("battleRightName"),
     battleRoundLabel: document.getElementById("battleRoundLabel"),
+    battleHonbaKyotakuLabel: document.getElementById("battleHonbaKyotakuLabel"),
     battleRemainingDraws: document.getElementById("battleRemainingDraws"),
     battleDealerLabel: document.getElementById("battleDealerLabel"),
     battleKyotakuLabel: document.getElementById("battleKyotakuLabel"),
@@ -379,7 +380,10 @@
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     const dealerPlayer = gameState.players[gameState.dealerIndex];
 
-    els.battleRoundLabel.textContent = `${windText(gameState.roundWind)}${gameState.handNumber}局 ${gameState.honba}本場 供託 ${kyotakuCount}`;
+    els.battleRoundLabel.textContent = `${windText(gameState.roundWind)}${gameState.handNumber}局`;
+    if (els.battleHonbaKyotakuLabel) {
+      els.battleHonbaKyotakuLabel.textContent = `${gameState.honba}本場 供託${kyotakuCount}`;
+    }
     els.battleRemainingDraws.textContent = `残 ${gameState.remainingDraws}`;
     els.battleDealerLabel.textContent = `親 ${playerPositionLabel(dealerPlayer?.seat)}`;
     els.battleKyotakuLabel.textContent = `手番 ${playerPositionLabel(currentPlayer?.seat)}`;
@@ -586,7 +590,10 @@
     els.battleSelfName.textContent = `自分 ${ownPlayer?.name || "Player 1"}`;
     els.battleRightName.textContent = `下家 ${rightPlayer?.name || "Player 2"}`;
     els.battleLeftName.textContent = `上家 ${leftPlayer?.name || "Player 3"}`;
-    els.battleRoundLabel.textContent = `${Rules.roundLabel(state)}${state.honba || 0}本場`;
+    els.battleRoundLabel.textContent = Rules.roundLabel(state);
+    if (els.battleHonbaKyotakuLabel) {
+      els.battleHonbaKyotakuLabel.textContent = `${state.honba || 0}本場 供託${kyotakuCount}`;
+    }
     els.battleRemainingDraws.textContent = "残りツモ --";
     els.battleDealerLabel.textContent = `親 ${state.players[dealer]?.name || `Player ${dealer + 1}`}`;
     els.battleKyotakuLabel.textContent = `供託${kyotakuCount}`;
