@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>マーチャオ三麻スコア卓</title>
-    <link rel="stylesheet" href="./styles.css?v=dark-green-table" />
+    <link rel="stylesheet" href="./styles.css?v=action-buttons" />
   </head>
   <body>
     <main class="app-shell">
@@ -64,7 +64,10 @@
 
           <div class="self-flower-lane" id="battleSelfFlowers" aria-label="自分の華牌"></div>
           <div class="self-hand-area">
-            <button class="primary-button battle-start-button" id="battleStartButton" type="button">対局開始</button>
+            <div class="battle-control-row">
+              <button class="primary-button battle-start-button" id="battleStartButton" type="button">対局開始</button>
+              <div class="battle-action-buttons" id="battleActionButtons" aria-label="対局アクション"></div>
+            </div>
             <div class="self-name" id="battleSelfName">自分</div>
             <div class="self-hand" id="battleSelfHand" aria-label="自分の手牌"></div>
           </div>
