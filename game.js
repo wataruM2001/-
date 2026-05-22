@@ -629,6 +629,12 @@
     if (tileIndex < 0) {
       throw new Error("Discard tile is not in the player's hand.");
     }
+    if (
+      next.riichiDeclaration?.playerIndex === playerIndex &&
+      !next.riichiDeclaration.options?.some((option) => option.tileId === tileId)
+    ) {
+      throw new Error("Riichi declaration discard is not tenpai or is furiten.");
+    }
     const [discarded] = player.hand.splice(tileIndex, 1);
     const isRiichiDeclaration =
       next.riichiDeclaration?.playerIndex === playerIndex &&
