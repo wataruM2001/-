@@ -280,6 +280,15 @@
     return (player?.melds || []).every((meld) => meld.type === "ankan");
   }
 
+  function meldTiles(player) {
+    return cloneTiles((player?.melds || []).flatMap((meld) => meld.tiles || []));
+  }
+
+  function seatWindForIndex(gameState, playerIndex) {
+    const winds = ["east", "south", "west"];
+    return winds[(playerIndex - gameState.dealerIndex + 3) % 3] || "west";
+  }
+
   function baseTileCandidates() {
     const seen = new Set();
     return (Tiles?.createTiles?.() || [])
@@ -292,14 +301,16 @@
       });
   }
 
-  function getWinningTiles(hand) {
+  function getWinningTiles(playerOrHand, fixedMelds = []) {
     const evaluator = HandEval();
     if (!evaluator?.getWinningCandidates) return [];
+    const hand = Array.isArray(playerOrHand) ? playerOrHand : playerOrHand?.hand || [];
+    const melds = Array.isArray(playerOrHand) ? fixedMelds : playerOrHand?.melds || [];
     const normalHand = cloneTiles(hand).filter((tile) => !tile.isFlower);
     if (normalHand.length % 3 !== 1) return [];
     return baseTileCandidates()
       .filter((candidateTile) =>
-        evaluator.getWinningCandidates([...normalHand, candidateTile], candidateTile).length > 0
+        evaluator.getWinningCandidates([...normalHand, candidateTile], candidateTile, { fixedMelds: melds }).length > 0
       )
       .map(tileBaseId)
       .sort();
@@ -315,7 +326,7 @@
     return true;
   }
 
-  function isFuriten(player, gameState, winningTiles = getWinningTiles(player?.hand || [])) {
+  function isFuriten(player, gameState, winningTiles = getWinningTiles(player)) {
     const waits = new Set(winningTiles);
     return (player?.discards || []).some((discard) => waits.has(tileBaseId(tileFromDiscard(discard))));
   }
@@ -324,13 +335,18 @@
     if (!player || !discardTile || player.seat === gameState.players[gameState.currentPlayerIndex]?.seat) {
       return false;
     }
+    if (isFuriten(player, gameState)) return false;
     const evaluator = HandEval();
     if (!evaluator?.evaluateWinningHand) return false;
+    const playerIndex = gameState.players.indexOf(player);
     const result = evaluator.evaluateWinningHand([...cloneTiles(player.hand), cloneTile(discardTile)], discardTile, {
-      allWinTiles: [...cloneTiles(player.hand), cloneTile(discardTile), ...cloneTiles(player.flowers)],
+      allWinTiles: [...cloneTiles(player.hand), cloneTile(discardTile), ...cloneTiles(player.flowers), ...meldTiles(player)],
+      fixedMelds: player.melds || [],
       isTsumo: false,
       isMenzen: isMenzen(player),
       isRiichi: Boolean(player.isRiichi),
+      roundWind: gameState.roundWind,
+      seatWind: seatWindForIndex(gameState, playerIndex),
       doraIndicators: gameState.doraIndicators,
       uraDoraIndicators: gameState.uraDoraIndicators,
     });
@@ -341,12 +357,16 @@
     if (!player || gameState.players[gameState.currentPlayerIndex] !== player) return false;
     const evaluator = HandEval();
     if (!evaluator?.evaluateWinningHand) return false;
+    const playerIndex = gameState.currentPlayerIndex;
     const drawnTile = drawnTileForPlayer(gameState, gameState.currentPlayerIndex);
     const result = evaluator.evaluateWinningHand(cloneTiles(player.hand), drawnTile, {
-      allWinTiles: [...cloneTiles(player.hand), ...cloneTiles(player.flowers)],
+      allWinTiles: [...cloneTiles(player.hand), ...cloneTiles(player.flowers), ...meldTiles(player)],
+      fixedMelds: player.melds || [],
       isTsumo: true,
       isMenzen: isMenzen(player),
       isRiichi: Boolean(player.isRiichi),
+      roundWind: gameState.roundWind,
+      seatWind: seatWindForIndex(gameState, playerIndex),
       doraIndicators: gameState.doraIndicators,
       uraDoraIndicators: gameState.uraDoraIndicators,
     });
@@ -415,7 +435,7 @@
       const index = trialHand.findIndex((candidate) => candidate.id === tile.id);
       if (index < 0) return;
       trialHand.splice(index, 1);
-      const waits = getWinningTiles(trialHand);
+      const waits = getWinningTiles({ ...player, hand: trialHand });
       if (waits.length === 0) return;
       if (isFuriten({ ...player, hand: trialHand }, gameState, waits)) return;
       options.push({ tileId: tile.id, waits });
@@ -442,7 +462,11 @@
       const afterKanHand = cloneTiles(player.hand).filter(
         (tile) => !candidate.tiles.some((kanTile) => kanTile.id === tile.id)
       );
-      const waits = getWinningTiles(afterKanHand);
+      const afterKanMelds = [
+        ...(player.melds || []),
+        { type: "ankan", baseId: candidate.baseId, tiles: candidate.tiles },
+      ];
+      const waits = getWinningTiles({ ...player, hand: afterKanHand, melds: afterKanMelds });
       return waits.length > 0 && areSameWinningTiles(waits, riichiWaits);
     });
   }
@@ -657,7 +681,7 @@
     const isRiichiDeclaration =
       next.riichiDeclaration?.playerIndex === playerIndex &&
       riichiDiscardOptions({ ...player, hand: [...player.hand, discarded] }, next).some((option) => option.tileId === tileId);
-    const riichiWaits = isRiichiDeclaration ? getWinningTiles(player.hand) : [];
+    const riichiWaits = isRiichiDeclaration ? getWinningTiles(player) : [];
     const isTsumogiri =
       next.lastAction?.type === "draw" &&
       next.lastAction.playerIndex === playerIndex &&
@@ -922,14 +946,17 @@
         : cloneTiles(winner.hand);
     const allWinTiles =
       winType === "ron"
-        ? [...cloneTiles(winner.hand), cloneTile(winningTile), ...cloneTiles(winner.flowers)]
-        : [...cloneTiles(winner.hand), ...cloneTiles(winner.flowers)];
+        ? [...cloneTiles(winner.hand), cloneTile(winningTile), ...cloneTiles(winner.flowers), ...meldTiles(winner)]
+        : [...cloneTiles(winner.hand), ...cloneTiles(winner.flowers), ...meldTiles(winner)];
     return evaluator.evaluateWinningHand(handTiles, winningTile, {
       allWinTiles,
+      fixedMelds: winner.melds || [],
       isTsumo: winType === "tsumo",
       isMenzen: isMenzen(winner),
       isRiichi: Boolean(winner.isRiichi),
       isDealer: winnerIndex === gameState.dealerIndex,
+      roundWind: gameState.roundWind,
+      seatWind: seatWindForIndex(gameState, winnerIndex),
       doraIndicators: gameState.doraIndicators,
       uraDoraIndicators: gameState.uraDoraIndicators,
     });
