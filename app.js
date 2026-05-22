@@ -29,6 +29,9 @@
     battleSelfHand: document.getElementById("battleSelfHand"),
     battleLeftHand: document.getElementById("battleLeftHand"),
     battleRightHand: document.getElementById("battleRightHand"),
+    battleSelfMelds: document.getElementById("battleSelfMelds"),
+    battleLeftMelds: document.getElementById("battleLeftMelds"),
+    battleRightMelds: document.getElementById("battleRightMelds"),
     battleSelfFlowers: document.getElementById("battleSelfFlowers"),
     battleLeftFlowers: document.getElementById("battleLeftFlowers"),
     battleRightFlowers: document.getElementById("battleRightFlowers"),
@@ -1031,6 +1034,76 @@
     return "tile-no-rotate";
   }
 
+  function calledTileIndexForMeld(meld, tiles) {
+    if (!meld || meld.type === "ankan") return null;
+    if (meld.calledFromSeat === "kamicha") return 0;
+    if (meld.calledFromSeat === "shimocha") return Math.max(0, tiles.length - 1);
+    return null;
+  }
+
+  function meldBaseTiles(meld) {
+    const tiles = [...(meld?.tiles || [])];
+    if (meld?.type === "kakan" && meld.addedTile) {
+      return tiles.filter((tile) => tile.id !== meld.addedTile.id).slice(0, 3);
+    }
+    return tiles;
+  }
+
+  function arrangeCalledMeldTiles(meld) {
+    const tiles = meldBaseTiles(meld);
+    if (meld?.type === "ankan" || !meld?.calledTile) return tiles;
+    const calledTile = meld.calledTile;
+    const handTiles = tiles.filter((tile) => tile.id !== calledTile.id);
+    if (meld.calledFromSeat === "kamicha") return [calledTile, ...handTiles];
+    if (meld.calledFromSeat === "shimocha") return [...handTiles, calledTile];
+    return tiles;
+  }
+
+  function renderMeldTile(tile, classes = "", useBack = false) {
+    if (!tile && !useBack) return "";
+    const src = useBack ? Tiles.tileImagePath("blue_back") : tile.image;
+    const label = useBack ? "裏向き牌" : tile.name || tile.baseId || tile.id;
+    return `<img class="table-tile-img meld-tile ${classes}" src="${escapeHtml(src)}" alt="${escapeHtml(label)}" loading="lazy" />`;
+  }
+
+  function renderMeld(meld) {
+    if (!meld) return "";
+    if (meld.type === "ankan") {
+      const tiles = meldBaseTiles(meld);
+      return `
+        <div class="meld-group ankan">
+          ${renderMeldTile(tiles[0], "", true)}
+          ${renderMeldTile(tiles[1])}
+          ${renderMeldTile(tiles[2])}
+          ${renderMeldTile(tiles[3], "", true)}
+        </div>
+      `;
+    }
+    const tiles = arrangeCalledMeldTiles(meld);
+    const calledIndex = calledTileIndexForMeld(meld, tiles);
+    return `
+      <div class="meld-group ${escapeHtml(meld.type || "")}">
+        ${tiles
+          .map((tile, index) => {
+            if (meld.type === "kakan" && index === calledIndex && meld.addedTile) {
+              return `
+                <span class="called-tile-stack">
+                  ${renderMeldTile(tile, "called-tile")}
+                  ${renderMeldTile(meld.addedTile, "called-tile added-kan-tile")}
+                </span>
+              `;
+            }
+            return renderMeldTile(tile, index === calledIndex ? "called-tile" : "");
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
+  function renderPlayerMelds(player) {
+    return (player?.melds || []).map(renderMeld).join("");
+  }
+
   function orderDiscardsForRiver(player) {
     return [...(player?.discards || [])];
   }
@@ -1098,6 +1171,9 @@
     els.battleStartButton.textContent = battleState.phase === "ryukyoku" ? "もう一局" : "対局開始";
 
     els.battleSelfHand.innerHTML = renderSelfHand(selfPlayer, battleState.players.indexOf(selfPlayer), canDiscard);
+    els.battleSelfMelds.innerHTML = renderPlayerMelds(selfPlayer);
+    els.battleLeftMelds.innerHTML = renderPlayerMelds(leftPlayer);
+    els.battleRightMelds.innerHTML = renderPlayerMelds(rightPlayer);
     els.battleSelfFlowers.innerHTML = (selfPlayer?.flowers || [])
       .map((tile) => renderBattleTile(tile, "flower-open self-flower-tile tile-no-rotate"))
       .join("");
@@ -1135,6 +1211,9 @@
     els.battleStatus.textContent = "待機中";
     els.battleStartButton.textContent = "対局開始";
     els.battleSelfHand.innerHTML = "";
+    els.battleSelfMelds.innerHTML = "";
+    els.battleLeftMelds.innerHTML = "";
+    els.battleRightMelds.innerHTML = "";
     els.battleSelfFlowers.innerHTML = "";
     els.battleLeftFlowers.innerHTML = "";
     els.battleRightFlowers.innerHTML = "";
