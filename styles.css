@@ -1615,16 +1615,17 @@ input[type="checkbox"] {
 
 #battleRoundLabel {
   width: 100%;
-  font-size: var(--center-river-tile-width);
+  font-size: calc(var(--center-river-tile-width) + 5px);
   line-height: 0.95;
   color: #f3d88e;
   font-weight: 900;
+  text-align: center;
 }
 
 #battleHonbaKyotakuLabel {
   width: 100%;
   margin-top: 4px;
-  font-size: calc(var(--center-river-tile-width) * 0.32 + 5px);
+  font-size: calc(var(--center-river-tile-width) * 0.32 + 3px);
   line-height: 1;
   color: rgba(255, 255, 255, 0.86);
   font-weight: 900;
