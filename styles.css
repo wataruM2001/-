@@ -1624,10 +1624,11 @@ input[type="checkbox"] {
 #battleHonbaKyotakuLabel {
   width: 100%;
   margin-top: 4px;
-  font-size: calc(var(--center-river-tile-width) * 0.32);
+  font-size: calc(var(--center-river-tile-width) * 0.32 + 5px);
   line-height: 1;
   color: rgba(255, 255, 255, 0.86);
   font-weight: 900;
+  text-align: center;
 }
 
 .center-table-layout #battleRemainingDraws {
