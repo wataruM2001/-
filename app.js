@@ -21,6 +21,7 @@
     battleRightFlowers: document.getElementById("battleRightFlowers"),
     battleDoraIndicators: document.getElementById("battleDoraIndicators"),
     battlePlayerScores: document.getElementById("battlePlayerScores"),
+    battleActionButtons: document.getElementById("battleActionButtons"),
     battleFlowerTiles: document.getElementById("battleFlowerTiles"),
     battleSelfRiver: document.getElementById("battleSelfRiver"),
     battleLeftRiver: document.getElementById("battleLeftRiver"),
@@ -102,6 +103,12 @@
       const tileImage = event.target.closest("[data-discard-tile-id]");
       if (!tileImage) return;
       handleHumanDiscard(tileImage.dataset.discardTileId);
+    });
+
+    els.battleActionButtons?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-battle-action]");
+      if (!button) return;
+      handleBattleAction(button.dataset.battleAction);
     });
 
     els.handForm.addEventListener("submit", (event) => {
@@ -297,6 +304,7 @@
       honba: state.honba || 0,
       kyotaku: Math.floor((Number(state.kyotaku) || 0) / 1000),
     });
+    battleState = Game.afterPlayerDraw(battleState);
     renderBattleTable();
     scheduleCpuTurn();
   }
@@ -307,7 +315,18 @@
     if (currentPlayer?.seat !== "self") return;
     try {
       battleState = Game.discardTile(battleState, battleState.currentPlayerIndex, tileId);
-      battleState = Game.nextTurn(battleState);
+      battleState = Game.afterPlayerDiscard(battleState);
+      renderBattleTable();
+      scheduleCpuTurn();
+    } catch (error) {
+      els.battleStatus.textContent = error.message;
+    }
+  }
+
+  function handleBattleAction(action) {
+    if (!battleState || battleState.phase !== "actionPending") return;
+    try {
+      battleState = Game.performPendingAction(battleState, action);
       renderBattleTable();
       scheduleCpuTurn();
     } catch (error) {
@@ -334,7 +353,7 @@
       return;
     }
     battleState = Game.discardTile(battleState, battleState.currentPlayerIndex, discard.id);
-    battleState = Game.nextTurn(battleState);
+    battleState = Game.afterPlayerDiscard(battleState);
     renderBattleTable();
     scheduleCpuTurn();
   }
@@ -342,6 +361,8 @@
   function battleStatusText() {
     if (!battleState) return "待機中";
     if (battleState.phase === "ryukyoku") return "流局しました";
+    if (battleState.phase === "result") return battleState.lastAction?.effect || "結果";
+    if (battleState.phase === "actionPending") return "アクション選択";
     const currentPlayer = battleState.players[battleState.currentPlayerIndex];
     if (battleState.phase === "discard" && currentPlayer?.seat === "self") return "あなたの打牌";
     if (currentPlayer?.isCpu) return "CPU思考中";
@@ -432,6 +453,26 @@
       const label = tile ? tile.name || tile.baseId || tile.id : "ドラ表示牌 裏";
       return `<img class="table-tile-img dora-indicator-tile" src="${escapeHtml(src)}" alt="${escapeHtml(label)}" loading="lazy" />`;
     }).join("");
+  }
+
+  function renderBattleActionButtons(gameState) {
+    if (!gameState || gameState.phase !== "actionPending") return "";
+    const actions = gameState.pendingAction?.availableActions || {};
+    const buttons = [
+      ["ron", "ロン", actions.canRon],
+      ["tsumo", "ツモ", actions.canTsumo],
+      ["pon", "ポン", actions.canPon],
+      ["kan", "カン", actions.canKan],
+      ["riichi", "リーチ", actions.canRiichi],
+      ["skip", "スキップ", actions.canSkip],
+    ];
+    return buttons
+      .filter(([, , enabled]) => enabled)
+      .map(
+        ([action, label]) =>
+          `<button class="primary-button battle-action-button" type="button" data-battle-action="${action}">${label}</button>`
+      )
+      .join("");
   }
 
   function battleTileSortValue(tile) {
@@ -579,6 +620,9 @@
     els.battleRightName.textContent = `下家 ${rightPlayer?.name || "CPU 下家"}`;
     els.battleLeftName.textContent = `上家 ${leftPlayer?.name || "CPU 上家"}`;
     renderCentralInfoPanel(battleState);
+    if (els.battleActionButtons) {
+      els.battleActionButtons.innerHTML = renderBattleActionButtons(battleState);
+    }
     els.battleStatus.textContent = battleStatusText();
     els.battleStartButton.textContent = battleState.phase === "ryukyoku" ? "もう一局" : "対局開始";
 
@@ -623,6 +667,7 @@
     els.battleLeftFlowers.innerHTML = "";
     els.battleRightFlowers.innerHTML = "";
     els.battleDoraIndicators.innerHTML = "";
+    if (els.battleActionButtons) els.battleActionButtons.innerHTML = "";
     if (els.battlePlayerScores) els.battlePlayerScores.innerHTML = renderCenterScoreDisplay(state.players);
     els.battleFlowerTiles.innerHTML = "";
     els.battleSelfRiver.innerHTML = "";
