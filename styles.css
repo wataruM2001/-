@@ -1336,6 +1336,40 @@ input[type="checkbox"] {
   padding: 0;
 }
 
+.discard-river {
+  position: relative;
+}
+
+.river-effect {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  color: #f3d88e;
+  font-size: 60px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.35),
+    0 12px 28px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.river-effect.marchao-effect {
+  font-size: 40px;
+}
+
+.river-effect.red-effect {
+  color: #e24c43;
+}
+
+.river-effect.blue-effect {
+  color: #3a88ff;
+}
+
 .river-self {
   width: calc(6 * var(--river-tile-width));
   height: calc(3 * var(--river-tile-long));
@@ -1359,7 +1393,7 @@ input[type="checkbox"] {
   --center-layout-top: clamp(118px, 22vh, 168px);
   --center-layout-upshift: calc(var(--center-river-tile-long) * 1.5);
   --center-layout-downshift: 20px;
-  --dora-tile-scale: 1;
+  --dora-tile-scale: 0.9;
   --dora-tile-width: calc(var(--center-river-tile-width) * var(--dora-tile-scale));
   --dora-tile-height: calc(var(--center-river-tile-long) * var(--dora-tile-scale));
   --dora-panel-gap: 4px;
@@ -1396,9 +1430,14 @@ input[type="checkbox"] {
   transform-origin: top center;
 }
 
-.center-table-layout .center-tableau,
-.center-table-layout .discard-river {
+.center-table-layout .center-tableau {
   position: static;
+  inset: auto;
+  transform: none;
+}
+
+.center-table-layout .discard-river {
+  position: relative;
   inset: auto;
   transform: none;
 }
@@ -1411,7 +1450,8 @@ input[type="checkbox"] {
   display: flex;
   justify-content: center;
   gap: 0;
-  transform: translateY(calc(-1 * (var(--dora-tile-height) + var(--dora-panel-gap))));
+  transform: translateY(2px);
+  z-index: 2;
 }
 
 .dora-indicator-tile {
@@ -1481,6 +1521,10 @@ input[type="checkbox"] {
   letter-spacing: 0;
   white-space: pre;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+}
+
+.score-display.dealer-score {
+  color: #f3d88e;
 }
 
 .kamicha-score {
@@ -1671,7 +1715,7 @@ input[type="checkbox"] {
   align-items: center;
   gap: var(--battle-action-gap);
   min-height: 34px;
-  transform: translateX(80px);
+  transform: translateX(140px);
 }
 
 .battle-action-button {
