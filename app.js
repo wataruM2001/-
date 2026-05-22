@@ -931,7 +931,7 @@
       els.kanSkipButton.classList.toggle("is-on", kanSkipEnabled);
       els.kanSkipButton.classList.toggle("is-off", !kanSkipEnabled);
       els.kanSkipButton.setAttribute("aria-pressed", String(kanSkipEnabled));
-      els.kanSkipButton.textContent = "カンスキップ";
+      els.kanSkipButton.textContent = "カン拒否";
     }
   }
 
