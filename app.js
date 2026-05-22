@@ -12,13 +12,8 @@
   let battleSettlement = null;
   let cpuTurnTimer = 0;
   let autoWinEnabled = true;
-  let noCallEnabled = false;
   let kanSkipEnabled = false;
   let settlementBreakdownVisible = false;
-  let battleEffectTimer = 0;
-  let battleEffectQueue = [];
-  let shownBattleEffectKeys = new Set();
-  let activeBattleEffect = null;
 
   const els = {
     undoButton: document.getElementById("undoButton"),
@@ -61,7 +56,6 @@
     battleKyotakuLabel: document.getElementById("battleKyotakuLabel"),
     battleStartButton: document.getElementById("battleStartButton"),
     autoWinButton: document.getElementById("autoWinButton"),
-    noCallButton: document.getElementById("noCallButton"),
     kanSkipButton: document.getElementById("kanSkipButton"),
     battleStatus: document.getElementById("battleStatus"),
     handForm: document.getElementById("handForm"),
@@ -144,15 +138,17 @@
     });
     els.autoWinButton?.addEventListener("click", () => {
       autoWinEnabled = !autoWinEnabled;
-      handleAutoButtonStateChange(autoWinEnabled);
-    });
-    els.noCallButton?.addEventListener("click", () => {
-      noCallEnabled = !noCallEnabled;
-      handleAutoButtonStateChange(noCallEnabled);
+      settleBattleAutomation();
+      enterResultIfHandEnded();
+      renderBattleTable();
+      scheduleCpuTurn();
     });
     els.kanSkipButton?.addEventListener("click", () => {
       kanSkipEnabled = !kanSkipEnabled;
-      handleAutoButtonStateChange(kanSkipEnabled);
+      settleBattleAutomation();
+      enterResultIfHandEnded();
+      renderBattleTable();
+      scheduleCpuTurn();
     });
 
     els.battleSelfHand?.addEventListener("click", (event) => {
@@ -348,7 +344,6 @@
       return;
     }
     window.clearTimeout(cpuTurnTimer);
-    resetBattleEffects();
     syncPlayersFromInputs();
     const initialDealerIndex = randomBattleDealerIndex();
     battleState = Game.startNewHand({
@@ -381,7 +376,8 @@
     lastHandResult = null;
     battleSettlement = null;
     settlementBreakdownVisible = false;
-    resetBattleAutomationToggles();
+    autoWinEnabled = true;
+    kanSkipEnabled = false;
     const initialDealerIndex = randomBattleDealerIndex();
     battleState = createBattleHand({
       dealerIndex: initialDealerIndex,
@@ -510,67 +506,6 @@
     return true;
   }
 
-  function removeNoCallFromPendingAction() {
-    const pending = battleState?.pendingAction;
-    const actions = pending?.availableActions || {};
-    if (!noCallEnabled || !isSelfPendingAction()) return false;
-
-    const nextActions = { ...actions };
-    let changed = false;
-    let candidates = pending.candidates || [];
-
-    if (nextActions.canPon) {
-      nextActions.canPon = false;
-      changed = true;
-    }
-    if (nextActions.canChi) {
-      nextActions.canChi = false;
-      changed = true;
-    }
-    if (nextActions.canKan) {
-      const ankanCandidates = candidates.filter((candidate) => candidate?.type === "ankan");
-      candidates = ankanCandidates;
-      if (ankanCandidates.length === 0) {
-        nextActions.canKan = false;
-        changed = true;
-      } else if (ankanCandidates.length !== (pending.candidates || []).length) {
-        changed = true;
-      }
-    }
-
-    if (!changed) return false;
-
-    const hasRemainingChoice = Boolean(
-      nextActions.canRon ||
-      nextActions.canTsumo ||
-      nextActions.canKan ||
-      nextActions.canRiichi
-    );
-    if (!hasRemainingChoice) {
-      battleState = Game.performPendingAction(battleState, "skip");
-      return true;
-    }
-    battleState = {
-      ...battleState,
-      pendingAction: {
-        ...pending,
-        availableActions: nextActions,
-        candidates,
-      },
-    };
-    return true;
-  }
-
-  function handleAutoButtonStateChange(shouldEvaluatePendingAction) {
-    if (shouldEvaluatePendingAction && settleBattleAutomation()) {
-      enterResultIfHandEnded();
-      renderBattleTable();
-      scheduleCpuTurn();
-      return;
-    }
-    renderAutoControlButtons();
-  }
-
   function settleBattleAutomation() {
     if (!battleState || appScreen !== "playing") return false;
     let changed = false;
@@ -582,10 +517,6 @@
         continue;
       }
       if (removeKanFromPendingAction()) {
-        changed = true;
-        continue;
-      }
-      if (removeNoCallFromPendingAction()) {
         changed = true;
         continue;
       }
@@ -643,7 +574,6 @@
       }
       lastHandResult = buildBattleHandResult(battleState);
       appScreen = "result";
-      resetBattleAutomationToggles();
     }
     return true;
   }
@@ -728,13 +658,6 @@
 
   function randomBattleDealerIndex() {
     return Math.floor(Math.random() * 3);
-  }
-
-  function resetBattleAutomationToggles() {
-    autoWinEnabled = true;
-    noCallEnabled = false;
-    kanSkipEnabled = false;
-    renderAutoControlButtons();
   }
 
   function battleInitialSeatOrder(gameState) {
@@ -902,7 +825,6 @@
   }
 
   function startNextBattleHand(nextRound) {
-    resetBattleEffects();
     const previousPlayers = battleState.players.map((player) => ({
       name: player.name,
       points: player.points,
@@ -1023,15 +945,13 @@
   function renderCenterScoreDisplay(players = []) {
     const bySeat = {};
     players.forEach((player, index) => {
-      bySeat[playerDisplaySeat(player, index)] = { player, index };
+      bySeat[playerDisplaySeat(player, index)] = player;
     });
     return ["kamicha", "shimocha", "self"]
       .map((seat) => {
-        const entry = bySeat[seat];
-        const player = entry?.player;
+        const player = bySeat[seat];
         const text = formatScoreDisplay(playerDisplayPoints(player), playerDisplayChipPoints(player));
-        const dealerClass = entry?.index === battleState?.dealerIndex ? "dealer-score" : "";
-        return `<div class="score-display ${seat}-score ${dealerClass}">${escapeHtml(text)}</div>`;
+        return `<div class="score-display ${seat}-score">${escapeHtml(text)}</div>`;
       })
       .join("");
   }
@@ -1091,12 +1011,6 @@
       els.autoWinButton.classList.toggle("is-off", !autoWinEnabled);
       els.autoWinButton.setAttribute("aria-pressed", String(autoWinEnabled));
       els.autoWinButton.textContent = "自動和了";
-    }
-    if (els.noCallButton) {
-      els.noCallButton.classList.toggle("is-on", noCallEnabled);
-      els.noCallButton.classList.toggle("is-off", !noCallEnabled);
-      els.noCallButton.setAttribute("aria-pressed", String(noCallEnabled));
-      els.noCallButton.textContent = "鳴き無し";
     }
     if (els.kanSkipButton) {
       els.kanSkipButton.classList.toggle("is-on", kanSkipEnabled);
@@ -1250,104 +1164,10 @@
   }
 
   function renderBattleEffect(gameState) {
-    hideGlobalBattleEffect();
-    const action = gameState?.lastAction || null;
-    if (!action) return;
-    for (const effect of battleEffectsFromAction(action)) {
-      if (
-        shownBattleEffectKeys.has(effect.key) ||
-        activeBattleEffect?.key === effect.key ||
-        battleEffectQueue.some((queued) => queued.key === effect.key)
-      ) {
-        continue;
-      }
-      shownBattleEffectKeys.add(effect.key);
-      battleEffectQueue.push(effect);
-    }
-    startNextBattleEffect();
-  }
-
-  function hideGlobalBattleEffect() {
+    const effect = gameState?.lastEffect || gameState?.lastAction?.effect || "";
     if (!els.battleEffect) return;
-    els.battleEffect.textContent = "";
-    els.battleEffect.hidden = true;
-  }
-
-  function resetBattleEffects() {
-    window.clearTimeout(battleEffectTimer);
-    battleEffectTimer = 0;
-    battleEffectQueue = [];
-    shownBattleEffectKeys = new Set();
-    activeBattleEffect = null;
-    hideGlobalBattleEffect();
-  }
-
-  function startNextBattleEffect() {
-    if (activeBattleEffect || battleEffectQueue.length === 0) return;
-    activeBattleEffect = battleEffectQueue.shift();
-    renderBattleRiversOnly();
-    window.clearTimeout(battleEffectTimer);
-    battleEffectTimer = window.setTimeout(() => {
-      activeBattleEffect = null;
-      renderBattleRiversOnly();
-      startNextBattleEffect();
-    }, 500);
-  }
-
-  function battleEffectsFromAction(action) {
-    if (!action) return [];
-    const effects = [];
-    const flowerDetails = flowersFromAction(action);
-    if (action.type === "draw" && flowerDetails.length > 0) {
-      flowerDetails.forEach((flower, index) => {
-        const effect = {
-          text: "マーチャオ",
-          playerIndex: action.playerIndex,
-          kind: "marchao",
-          colorClass: flower?.color === "blue" ? "blue" : "red",
-          flowerId: flower?.id || "",
-          flowerIndex: index,
-        };
-        effects.push({ ...effect, key: battleEffectKey(action, effect) });
-      });
-    }
-    const text = action.effect || "";
-    const playerIndex = Number.isInteger(action.playerIndex)
-      ? action.playerIndex
-      : Number.isInteger(action.winnerIndex)
-        ? action.winnerIndex
-        : null;
-    if (text && Number.isInteger(playerIndex)) {
-      const effect = {
-        text,
-        playerIndex: action.playerIndex,
-        kind: "normal",
-        colorClass: "",
-      };
-      effect.playerIndex = playerIndex;
-      effects.push({ ...effect, key: battleEffectKey(action, effect) });
-    }
-    return effects;
-  }
-
-  function flowersFromAction(action) {
-    if (!Array.isArray(action?.flowers) || !Number.isInteger(action.playerIndex)) return [];
-    const flowerIds = new Set(action.flowers);
-    return (battleState?.players?.[action.playerIndex]?.flowers || []).filter((tile) => flowerIds.has(tile.id));
-  }
-
-  function battleEffectKey(action, effect) {
-    return [
-      action.type || "",
-      effect.kind || "",
-      effect.playerIndex,
-      effect.text,
-      action.tileId || "",
-      action.winningTile?.id || "",
-      action.kanType || "",
-      effect.flowerId || "",
-      effect.flowerIndex ?? "",
-    ].join(":");
+    els.battleEffect.textContent = effect;
+    els.battleEffect.hidden = !effect;
   }
 
   function battleTileSortValue(tile) {
@@ -1482,15 +1302,11 @@
     return tiles;
   }
 
-  function renderMeldTileImage(tile, classes = "", useBack = false) {
+  function renderMeldTile(tile, classes = "", useBack = false) {
     if (!tile && !useBack) return "";
     const src = useBack ? Tiles.tileImagePath("blue_back") : tile.image;
     const label = useBack ? "裏向き牌" : tile.name || tile.baseId || tile.id;
     return `<img class="table-tile-img meld-tile ${classes}" src="${escapeHtml(src)}" alt="${escapeHtml(label)}" loading="lazy" />`;
-  }
-
-  function renderMeldTile(tile, classes = "", useBack = false) {
-    return `<span class="meld-tile-slot">${renderMeldTileImage(tile, classes, useBack)}</span>`;
   }
 
   function renderMeld(meld) {
@@ -1514,11 +1330,9 @@
           .map((tile, index) => {
             if (meld.type === "kakan" && index === calledIndex && meld.addedTile) {
               return `
-                <span class="meld-tile-slot">
-                  <span class="called-tile-stack">
-                    ${renderMeldTileImage(tile, "called-tile")}
-                    ${renderMeldTileImage(meld.addedTile, "called-tile added-kan-tile")}
-                  </span>
+                <span class="called-tile-stack">
+                  ${renderMeldTile(tile, "called-tile")}
+                  ${renderMeldTile(meld.addedTile, "called-tile added-kan-tile")}
                 </span>
               `;
             }
@@ -1537,19 +1351,6 @@
     return [...(player?.discards || [])];
   }
 
-  function renderRiverEffect(player) {
-    const playerIndex = battleState?.players?.indexOf(player);
-    if (!activeBattleEffect || activeBattleEffect.playerIndex !== playerIndex) return "";
-    const classes = [
-      "river-effect",
-      activeBattleEffect.kind === "marchao" ? "marchao-effect" : "",
-      activeBattleEffect.colorClass ? `${activeBattleEffect.colorClass}-effect` : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-    return `<div class="${classes}">${escapeHtml(activeBattleEffect.text)}</div>`;
-  }
-
   function riverTileStyleForSeat(seat, index) {
     if (seat === "self") {
       const row = Math.floor(index / 6) + 1;
@@ -1566,7 +1367,7 @@
 
   function renderDiscardRiver(player) {
     const rotationClass = tileRotationClassForSeat(player?.seat);
-    const tiles = orderDiscardsForRiver(player)
+    return orderDiscardsForRiver(player)
       .map((discard, index) => {
         const tile = discardTileOf(discard);
         if (!tile) return "";
@@ -1581,17 +1382,6 @@
         return renderBattleTile(tile, classes, false, riverTileStyleForSeat(player?.seat, index));
       })
       .join("");
-    return tiles + renderRiverEffect(player);
-  }
-
-  function renderBattleRiversOnly() {
-    if (!battleState) return;
-    const selfPlayer = battleState.players.find((player) => player.seat === "self");
-    const rightPlayer = battleState.players.find((player) => player.seat === "shimocha");
-    const leftPlayer = battleState.players.find((player) => player.seat === "kamicha");
-    if (els.battleSelfRiver) els.battleSelfRiver.innerHTML = renderDiscardRiver(selfPlayer);
-    if (els.battleLeftRiver) els.battleLeftRiver.innerHTML = renderDiscardRiver(leftPlayer);
-    if (els.battleRightRiver) els.battleRightRiver.innerHTML = renderDiscardRiver(rightPlayer);
   }
 
   function renderBattleTable() {
@@ -1647,7 +1437,6 @@
   }
 
   function renderEmptyBattleTable() {
-    resetBattleEffects();
     const ownPlayer = state.players[0];
     const rightPlayer = state.players[1];
     const leftPlayer = state.players[2];
