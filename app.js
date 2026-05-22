@@ -873,7 +873,7 @@
 
   function renderCentralInfoPanel(gameState) {
     if (!gameState) return;
-    const kyotakuCount = Math.floor((Number(gameState.kyotaku) || 0) / 1000);
+    const kyotakuCount = Math.max(0, Math.floor(Number(gameState.kyotaku) || 0));
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     const dealerPlayer = gameState.players[gameState.dealerIndex];
 
