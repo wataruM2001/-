@@ -123,6 +123,23 @@ button {
     linear-gradient(0deg, rgba(0, 0, 0, 0.22), transparent 22%, rgba(0, 0, 0, 0.18));
 }
 
+.battle-effect {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  color: #f3d88e;
+  font-size: 60px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.35),
+    0 12px 28px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
 .opponent-hand {
   position: absolute;
   top: 9%;
