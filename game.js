@@ -66,6 +66,17 @@
     return Array.isArray(discards) ? discards.map(cloneDiscard).filter(Boolean) : [];
   }
 
+  function cloneMeld(meld) {
+    return meld
+      ? {
+          ...meld,
+          tiles: cloneTiles(meld.tiles),
+          calledTile: cloneTile(meld.calledTile),
+          addedTile: cloneTile(meld.addedTile),
+        }
+      : null;
+  }
+
   function tilesFromDiscards(discards) {
     return cloneTiles((discards || []).map(tileFromDiscard));
   }
@@ -76,7 +87,7 @@
       hand: cloneTiles(player.hand),
       discards: cloneDiscards(player.discards),
       flowers: cloneTiles(player.flowers),
-      melds: Array.isArray(player.melds) ? player.melds.map((meld) => ({ ...meld })) : [],
+      melds: Array.isArray(player.melds) ? player.melds.map(cloneMeld).filter(Boolean) : [],
       riichiWinningTiles: Array.isArray(player.riichiWinningTiles)
         ? [...player.riichiWinningTiles]
         : [],
@@ -233,6 +244,13 @@
 
   function nextPlayerIndex(index) {
     return (Number(index) + 1) % 3;
+  }
+
+  function calledFromSeatFor(playerIndex, fromPlayerIndex) {
+    if (!Number.isInteger(fromPlayerIndex)) return undefined;
+    if (fromPlayerIndex === (playerIndex + 2) % 3) return "kamicha";
+    if (fromPlayerIndex === (playerIndex + 1) % 3) return "shimocha";
+    return undefined;
   }
 
   function tileBaseId(tile) {
@@ -782,6 +800,9 @@
     if (!canPon(player, discardTile)) throw new Error("Pon is not available.");
     const baseId = tileBaseId(discardTile);
     const handTiles = sameBaseTiles(player.hand, baseId).slice(0, 2);
+    const calledFromIndex = next.lastAction?.playerIndex;
+    const calledTile = cloneTile(discardTile);
+    const calledFromSeat = calledFromSeatFor(playerIndex, calledFromIndex);
     const removedDiscard = discarder ? removeLastDiscard(discarder, discardTile.id) : { removed: null, discards: [] };
     if (discarder) discarder.discards = removedDiscard.discards;
     player.hand = removeTilesById(player.hand, handTiles);
@@ -789,8 +810,11 @@
       id: `pon_${baseId}_${player.melds.length + 1}`,
       type: "pon",
       baseId,
-      tiles: [...handTiles, cloneTile(discardTile)],
-      fromPlayerIndex: next.lastAction?.playerIndex,
+      tiles: calledFromSeat === "kamicha" ? [calledTile, ...handTiles] : [...handTiles, calledTile],
+      calledTile,
+      calledFrom: discarder?.id,
+      calledFromSeat,
+      fromPlayerIndex: calledFromIndex,
     });
     next.currentPlayerIndex = playerIndex;
     next.pendingAction = null;
@@ -846,6 +870,9 @@
       });
     } else if (kan.type === "minkan") {
       const discarder = next.players[next.lastAction?.playerIndex];
+      const calledFromIndex = next.lastAction?.playerIndex;
+      const calledTile = cloneTile(kan.claimedTile);
+      const calledFromSeat = calledFromSeatFor(playerIndex, calledFromIndex);
       if (discarder && kan.claimedTile) {
         discarder.discards = removeLastDiscard(discarder, kan.claimedTile.id).discards;
       }
@@ -854,8 +881,11 @@
         id: `minkan_${kan.baseId}_${player.melds.length + 1}`,
         type: "minkan",
         baseId: kan.baseId,
-        tiles: [...cloneTiles(kan.tiles), cloneTile(kan.claimedTile)],
-        fromPlayerIndex: next.lastAction?.playerIndex,
+        tiles: calledFromSeat === "kamicha" ? [calledTile, ...cloneTiles(kan.tiles)] : [...cloneTiles(kan.tiles), calledTile],
+        calledTile,
+        calledFrom: discarder?.id,
+        calledFromSeat,
+        fromPlayerIndex: calledFromIndex,
       });
     } else if (kan.type === "kakan") {
       const tile = kan.tiles[0];
@@ -864,6 +894,7 @@
       if (meld) {
         meld.type = "kakan";
         meld.tiles = [...cloneTiles(meld.tiles), cloneTile(tile)];
+        meld.addedTile = cloneTile(tile);
       }
     }
 
