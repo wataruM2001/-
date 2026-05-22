@@ -1578,11 +1578,7 @@
         ]
           .filter(Boolean)
           .join(" ");
-        return `<span class="discard-tile-slot" ${riverTileStyleForSeat(player?.seat, index)}>${renderBattleTile(
-          tile,
-          classes,
-          false
-        )}</span>`;
+        return renderBattleTile(tile, classes, false, riverTileStyleForSeat(player?.seat, index));
       })
       .join("");
     return tiles + renderRiverEffect(player);
