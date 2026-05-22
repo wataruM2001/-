@@ -454,7 +454,7 @@
     if (gameState.lastAction?.ryukyokuSettled) return gameState;
     const pointDeltas = [0, 0, 0];
     const tenpaiPlayerIndexes = gameState.players
-      .map((player, index) => ({ player, index, waits: Game.getWinningTiles(player.hand) }))
+      .map((player, index) => ({ player, index, waits: Game.getWinningTiles(player) }))
       .filter((entry) => entry.waits.length > 0)
       .map((entry) => entry.index);
     const notenPlayerIndexes = [0, 1, 2].filter((index) => !tenpaiPlayerIndexes.includes(index));
