@@ -132,6 +132,7 @@
       if (!tileImage) return;
       handleHumanDiscard(tileImage.dataset.discardTileId);
     });
+    document.addEventListener("contextmenu", handleContextMenuTsumogiri);
 
     els.battleActionButtons?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-battle-action]");
@@ -385,7 +386,12 @@
   }
 
   function handleHumanDiscard(tileId) {
-    if (!battleState || appScreen !== "playing" || battleState.phase !== "discard") return;
+    if (!battleState || appScreen !== "playing") return;
+    if (battleState.phase === "actionPending") {
+      if (!Game.canDiscardDuringActionPending?.(battleState)) return;
+      battleState = Game.skipOptionalSelfActionsBeforeDiscard(battleState);
+    }
+    if (battleState.phase !== "discard") return;
     const currentPlayer = battleState.players[battleState.currentPlayerIndex];
     if (currentPlayer?.seat !== "self") return;
     try {
@@ -397,6 +403,25 @@
     } catch (error) {
       els.battleStatus.textContent = error.message;
     }
+  }
+
+  function discardDrawnTileAsTsumogiri() {
+    if (!battleState || appScreen !== "playing") return;
+    const selfIndex = battleState.players.findIndex((player) => player.seat === "self");
+    if (selfIndex < 0 || battleState.currentPlayerIndex !== selfIndex) return;
+    const selfPlayer = battleState.players[selfIndex];
+    const drawnTile = splitHandForDisplay(selfPlayer, selfIndex).drawnTile;
+    if (!drawnTile) return;
+    handleHumanDiscard(drawnTile.id);
+  }
+
+  function handleContextMenuTsumogiri(event) {
+    if (appScreen !== "playing") return;
+    event.preventDefault();
+    if (!battleState) return;
+    if (battleState.phase === "actionPending" && !Game.canDiscardDuringActionPending?.(battleState)) return;
+    if (battleState.phase !== "discard" && battleState.phase !== "actionPending") return;
+    discardDrawnTileAsTsumogiri();
   }
 
   function handleBattleAction(action) {
@@ -965,7 +990,7 @@
 
   function drawnTileIdForPlayer(playerIndex) {
     if (
-      battleState?.phase === "discard" &&
+      (battleState?.phase === "discard" || battleState?.phase === "actionPending") &&
       battleState.lastAction?.type === "draw" &&
       battleState.lastAction.playerIndex === playerIndex
     ) {
@@ -1154,7 +1179,7 @@
     const currentPlayer = battleState.players[battleState.currentPlayerIndex];
     const openFlowers = battleState.players.flatMap((player) => player.flowers);
     const canDiscard =
-      battleState.phase === "discard" &&
+      (battleState.phase === "discard" || Game.canDiscardDuringActionPending?.(battleState)) &&
       currentPlayer?.seat === "self" &&
       (!battleState.riichiDeclaration ||
         battleState.riichiDeclaration.playerIndex === battleState.currentPlayerIndex);
