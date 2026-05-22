@@ -1368,6 +1368,9 @@
   function startNewHand(options = {}) {
     assertTiles();
     const dealerIndex = Number.isInteger(options.dealerIndex) ? options.dealerIndex : 0;
+    const initialDealerIndex = Number.isInteger(options.initialDealerIndex)
+      ? options.initialDealerIndex
+      : dealerIndex;
     const wallSections = splitWall(createWall(options.random || Math.random));
 
     const gameState = {
@@ -1378,6 +1381,7 @@
       players: createPlayers({ ...options, dealerIndex }),
       currentPlayerIndex: dealerIndex,
       dealerIndex,
+      initialDealerIndex,
       roundWind: options.roundWind || "east",
       handNumber: options.handNumber || 1,
       honba: Math.max(0, Math.floor(Number(options.honba) || 0)),
