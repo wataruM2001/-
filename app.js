@@ -13,6 +13,7 @@
   let cpuTurnTimer = 0;
   let autoWinEnabled = true;
   let kanSkipEnabled = false;
+  let settlementBreakdownVisible = false;
 
   const els = {
     undoButton: document.getElementById("undoButton"),
@@ -27,6 +28,7 @@
     battleEndButton: document.getElementById("battleEndButton"),
     battleSettlementPanel: document.getElementById("battleSettlementPanel"),
     battleSettlementBody: document.getElementById("battleSettlementBody"),
+    battleSettlementDetailButton: document.getElementById("battleSettlementDetailButton"),
     battleRestartButton: document.getElementById("battleRestartButton"),
     battleSelfHand: document.getElementById("battleSelfHand"),
     battleLeftHand: document.getElementById("battleLeftHand"),
@@ -129,6 +131,10 @@
     });
     els.battleRestartButton?.addEventListener("click", () => {
       startBattleHanchan();
+    });
+    els.battleSettlementDetailButton?.addEventListener("click", () => {
+      settlementBreakdownVisible = !settlementBreakdownVisible;
+      renderBattleSettlementPanel();
     });
     els.autoWinButton?.addEventListener("click", () => {
       autoWinEnabled = !autoWinEnabled;
@@ -369,6 +375,7 @@
     appScreen = "playing";
     lastHandResult = null;
     battleSettlement = null;
+    settlementBreakdownVisible = false;
     autoWinEnabled = true;
     kanSkipEnabled = false;
     const initialDealerIndex = randomBattleDealerIndex();
@@ -785,6 +792,7 @@
     if (!lastHandResult || lastHandResult.requiresOorasuDealerChoice) return;
     if (lastHandResult.isHanchanEnded) {
       battleSettlement = buildBattleSettlement(battleState);
+      settlementBreakdownVisible = false;
       appScreen = "settlement";
       renderBattleTable();
       return;
@@ -811,6 +819,7 @@
       requiresOorasuDealerChoice: false,
     };
     battleSettlement = buildBattleSettlement(battleState);
+    settlementBreakdownVisible = false;
     appScreen = "settlement";
     renderBattleTable();
   }
@@ -1113,10 +1122,9 @@
     const settlement = battleSettlement || (battleState ? buildBattleSettlement(battleState) : []);
     els.battleSettlementBody.innerHTML = settlement
       .map(
-        (item) => `
-          <article class="battle-settlement-card">
-            <strong>${item.rank}位：${escapeHtml(item.name)}</strong>
-            <span>最終持ち点：${Number(item.points).toLocaleString("ja-JP")}</span>
+        (item) => {
+          const detailRows = settlementBreakdownVisible
+            ? `
             <span>素点：${formatBattlePointDelta(item.basePointScore)}</span>
             <span>ウマ：${formatBattleDelta(item.uma)}</span>
             <span>オカ：${formatBattleDelta(item.oka)}</span>
@@ -1125,11 +1133,23 @@
             <span>祝儀：${formatBattleDelta(item.chipScore)}</span>
             <span>内部最終ポイント：${formatBattlePointDelta(item.internalFinalPoint)}</span>
             <span>供託回収：${formatBattleDelta(item.kyotakuRecovery, "点")}</span>
+          `
+            : "";
+          return `
+          <article class="battle-settlement-card">
+            <strong>${item.rank}位：${escapeHtml(item.name)}</strong>
+            <span>最終持ち点：${Number(item.points).toLocaleString("ja-JP")}</span>
+            ${detailRows}
             <b>最終ポイント：${formatBattleDelta(item.displayFinalPoint)}</b>
           </article>
-        `
+        `;
+        }
       )
       .join("");
+    if (els.battleSettlementDetailButton) {
+      els.battleSettlementDetailButton.textContent = "精算内訳";
+      els.battleSettlementDetailButton.setAttribute("aria-pressed", String(settlementBreakdownVisible));
+    }
   }
 
   function renderBattleScreenPanels() {
