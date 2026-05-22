@@ -339,13 +339,15 @@
     }
     window.clearTimeout(cpuTurnTimer);
     syncPlayersFromInputs();
+    const initialDealerIndex = randomBattleDealerIndex();
     battleState = Game.startNewHand({
       playerNames: [
         state.players[0]?.name || "Player 1",
         state.players[1]?.name || "CPU 下家",
         state.players[2]?.name || "CPU 上家",
       ],
-      dealerIndex: 0,
+      dealerIndex: initialDealerIndex,
+      initialDealerIndex,
       roundWind: "east",
       handNumber: 1,
       honba: state.honba || 0,
@@ -369,8 +371,10 @@
     battleSettlement = null;
     autoWinEnabled = true;
     kanSkipEnabled = false;
+    const initialDealerIndex = randomBattleDealerIndex();
     battleState = createBattleHand({
-      dealerIndex: 0,
+      dealerIndex: initialDealerIndex,
+      initialDealerIndex,
       roundWind: "east",
       handNumber: 1,
       honba: 0,
@@ -645,6 +649,17 @@
     return gameState.players[playerIndex]?.name || `Player ${playerIndex + 1}`;
   }
 
+  function randomBattleDealerIndex() {
+    return Math.floor(Math.random() * 3);
+  }
+
+  function battleInitialSeatOrder(gameState) {
+    const dealerIndex = Number.isInteger(gameState?.initialDealerIndex)
+      ? gameState.initialDealerIndex
+      : 0;
+    return [dealerIndex, (dealerIndex + 1) % 3, (dealerIndex + 2) % 3];
+  }
+
   function pointRecordFromDeltas(deltas = []) {
     return {
       self: Number(deltas[0]) || 0,
@@ -716,7 +731,7 @@
       canEndOorasu: requiresOorasuDealerChoice,
       endReason,
       action,
-      rankings: rankBattlePlayers(gameState.players),
+      rankings: rankBattlePlayers(gameState.players, battleInitialSeatOrder(gameState)),
     };
   }
 
@@ -770,6 +785,9 @@
         handNumber: nextRound.handNumber,
         honba: nextRound.honba,
         kyotaku: Number(battleState.kyotaku) || 0,
+        initialDealerIndex: Number.isInteger(battleState.initialDealerIndex)
+          ? battleState.initialDealerIndex
+          : battleState.dealerIndex,
       },
       previousPlayers
     );
@@ -780,7 +798,7 @@
   }
 
   function buildBattleSettlement(gameState) {
-    const initialOrder = [0, 1, 2];
+    const initialOrder = battleInitialSeatOrder(gameState);
     const kyotaku = Math.max(0, Math.floor(Number(gameState.kyotaku) || 0));
     const settlementPlayers = gameState.players.map((player, index) => ({ ...player, index }));
     const topBeforeKyotaku = rankBattlePlayers(settlementPlayers, initialOrder)[0];
