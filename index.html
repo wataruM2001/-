@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>マーチャオサンマ</title>
-    <link rel="stylesheet" href="./styles.css?v=start-button-arcade" />
+    <link rel="stylesheet" href="./styles.css?v=start-menu-buttons" />
   </head>
   <body>
     <main class="app-shell">
@@ -86,7 +86,9 @@
               <button class="primary-button toggle-action-button is-on" id="autoWinButton" type="button" aria-pressed="true">自動和了</button>
             </div>
             <div class="battle-control-row">
-              <button class="primary-button battle-start-button" id="battleStartButton" type="button">対局開始</button>
+              <button class="primary-button battle-start-button start-menu-button" id="battleStartButton" type="button">対局開始</button>
+              <button class="primary-button start-menu-button start-menu-secondary" id="startRulesButton" type="button" disabled>ルール</button>
+              <button class="primary-button start-menu-button start-menu-secondary" id="startStatsButton" type="button" disabled>成績</button>
               <div class="battle-action-buttons" id="battleActionButtons" aria-label="対局アクション"></div>
             </div>
             <div class="self-name" id="battleSelfName">自分</div>
