@@ -6,6 +6,56 @@
   const Game = window.MahjongGame;
   const STORAGE_KEY = "marchao-sanma-score-table-v1";
   const RESULT_TRANSITION_DELAY_MS = 1000;
+  const RESULT_YAKU_NAME_MAP = {
+    riichi: "立直",
+    double_riichi: "ダブル立直",
+    ippatsu: "一発",
+    menzen_tsumo: "ツモ",
+    tanyao: "タンヤオ",
+    pinfu: "平和",
+    iipeiko: "一盃口",
+    iipeikou: "一盃口",
+    ryanpeiko: "二盃口",
+    ryanpeikou: "二盃口",
+    yakuhai_white: "役牌 白",
+    yakuhai_green: "役牌 發",
+    yakuhai_red: "役牌 中",
+    yakuhai_north: "役牌 北",
+    yakuhai_east: "役牌 東",
+    yakuhai_south: "役牌 南",
+    yakuhai_west: "役牌 西",
+    round_wind: "場風牌",
+    seat_wind: "自風牌",
+    toitoi: "対々和",
+    sananko: "三暗刻",
+    sanshoku_doko: "三色同刻",
+    sankantsu: "三槓子",
+    shosangen: "小三元",
+    honroto: "混老頭",
+    honroutou: "混老頭",
+    chiitoitsu: "七対子",
+    chanta: "混全帯么九",
+    junchan: "純全帯么九",
+    ittsu: "一気通貫",
+    ittsuu: "一気通貫",
+    honitsu: "混一色",
+    chinitsu: "清一色",
+    kokushi: "国士無双",
+    churen: "九連宝燈",
+    suanko: "四暗刻",
+    suuanko: "四暗刻",
+    daisangen: "大三元",
+    shosushi: "小四喜",
+    daisushi: "大四喜",
+    tsuiso: "字一色",
+    chinroto: "清老頭",
+    ryuiso: "緑一色",
+    sukantsu: "四槓子",
+    manhon: "萬混",
+    daisharin: "大車輪",
+    nagashi_yakuman: "流し役満",
+    kazoe_yakuman: "数え役満",
+  };
   let state = loadState();
   let battleState = null;
   let appScreen = "start";
@@ -740,22 +790,35 @@
     return next;
   }
 
+  function formatResultPointNumber(value) {
+    return String(Number(value) || 0);
+  }
+
   function formatWinPointText(evaluation, winType) {
     const points = evaluation?.best?.points;
     if (!points) return "点数：-";
     if (points.isTsumo || winType === "tsumo") {
       const parentPayment = points.payments?.find((payment) => payment.payer === "parent")?.amount;
       const childPayment = points.payments?.find((payment) => payment.payer === "child")?.amount;
-      if (points.isDealer) return `点数：${Number(childPayment || 0).toLocaleString("ja-JP")}点オール`;
-      return `点数：親 ${Number(parentPayment || 0).toLocaleString("ja-JP")}点 / 子 ${Number(childPayment || 0).toLocaleString("ja-JP")}点`;
+      if (points.isDealer || Number(parentPayment) === Number(childPayment)) {
+        return `点数：${formatResultPointNumber(childPayment || parentPayment)}∀`;
+      }
+      return `点数：${formatResultPointNumber(childPayment)}/${formatResultPointNumber(parentPayment)}`;
     }
     const amount = points.payments?.[0]?.amount || points.total || 0;
-    return `点数：${Number(amount).toLocaleString("ja-JP")}点`;
+    return `点数：${formatResultPointNumber(amount)}`;
+  }
+
+  function formatResultYakuName(yaku) {
+    const rawName = String(yaku?.displayName || yaku?.label || yaku?.name || yaku?.id || "").trim();
+    if (!rawName) return "";
+    const normalized = rawName.toLowerCase();
+    return RESULT_YAKU_NAME_MAP[normalized] || RESULT_YAKU_NAME_MAP[rawName] || rawName;
   }
 
   function formatWinYakuText(evaluation) {
     const best = evaluation?.best;
-    const yakuNames = (best?.yaku || []).map((yaku) => yaku.name).filter(Boolean);
+    const yakuNames = (best?.yaku || []).map(formatResultYakuName).filter(Boolean);
     const doraHan = Number(best?.dora?.totalHan) || 0;
     if (doraHan > 0) yakuNames.push(`ドラ${doraHan}`);
     return `役：${yakuNames.length ? yakuNames.join(" / ") : "なし"}`;
