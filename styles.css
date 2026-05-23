@@ -276,11 +276,11 @@ button {
 }
 
 .result-meld-row .table-tile-img.called-tile {
-  transform: rotate(90deg) scale(0.71);
+  transform: rotate(90deg);
 }
 
 .result-meld-row .called-tile-stack .added-kan-tile {
-  transform: translateX(-50%) rotate(90deg) scale(0.71);
+  transform: translateX(-50%) rotate(90deg);
 }
 
 .result-player-row {
@@ -575,7 +575,7 @@ button {
 }
 
 .meld-area .table-tile-img.called-tile {
-  transform: rotate(calc(var(--meld-seat-rotation) + 90deg)) scale(0.71);
+  transform: rotate(calc(var(--meld-seat-rotation) + 90deg));
 }
 
 .called-tile-stack {
@@ -594,7 +594,7 @@ button {
   position: absolute;
   top: -8px;
   left: 50%;
-  transform: translateX(-50%) rotate(calc(var(--meld-seat-rotation) + 90deg)) scale(0.71);
+  transform: translateX(-50%) rotate(calc(var(--meld-seat-rotation) + 90deg));
 }
 
 .self-flower-lane {
