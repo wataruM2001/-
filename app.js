@@ -75,6 +75,7 @@
     undoButton: document.getElementById("undoButton"),
     resetButton: document.getElementById("resetButton"),
     battleTable: document.getElementById("battleTable"),
+    battleSurface: document.querySelector(".battle-surface"),
     battleEffect: document.getElementById("battleEffect"),
     battleResultPanel: document.getElementById("battleResultPanel"),
     battleResultTitle: document.getElementById("battleResultTitle"),
@@ -1388,6 +1389,7 @@
   function renderBattleScreenPanels() {
     const isResult = appScreen === "result";
     const isSettlement = appScreen === "settlement";
+    els.battleSurface?.classList.toggle("is-start-screen", appScreen === "start");
     if (els.battleResultPanel) els.battleResultPanel.hidden = !isResult;
     if (els.battleSettlementPanel) els.battleSettlementPanel.hidden = !isSettlement;
     if (els.battleStartButton) els.battleStartButton.hidden = appScreen !== "start";
