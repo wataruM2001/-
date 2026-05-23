@@ -849,9 +849,9 @@
     if (!winner || !action?.evaluation) return null;
     const winningTile = action.winningTile || null;
     const isRon = action.winType === "ron";
-    const handTiles = isRon
+    const handTiles = sortedBattleTiles(isRon
       ? [...(winner.hand || [])]
-      : removeOneTileById(winner.hand || [], winningTile?.id);
+      : removeOneTileById(winner.hand || [], winningTile?.id));
     return {
       winnerId: winner.id,
       title: winDisplayTitle(winner),
