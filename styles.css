@@ -165,7 +165,7 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: clamp(14px, 2vh, 20px);
+  gap: clamp(24px, 3vh, 32px);
   width: auto;
   pointer-events: none;
 }
@@ -179,9 +179,9 @@ button {
 }
 
 .battle-surface.is-start-screen .start-menu-button {
-  min-width: clamp(230px, 24vw, 320px);
-  min-height: clamp(62px, 7vw, 82px);
-  padding: 0 clamp(28px, 3.2vw, 44px);
+  min-width: clamp(280px, 30vw, 390px);
+  min-height: clamp(72px, 8vw, 96px);
+  padding: 0 clamp(36px, 3.8vw, 56px);
   border: 2px solid rgba(255, 217, 118, 0.96);
   border-radius: 999px;
   color: #fff0a8;
@@ -194,7 +194,7 @@ button {
     0 0 18px rgba(255, 62, 30, 0.68),
     0 8px 0 rgba(54, 0, 0, 0.92),
     0 20px 42px rgba(0, 0, 0, 0.5);
-  font-size: clamp(1.3rem, 2.5vw, 2rem);
+  font-size: clamp(1.48rem, 2.8vw, 2.25rem);
   font-weight: 900;
   letter-spacing: 0.08em;
   text-shadow:
@@ -257,12 +257,13 @@ button {
 
   .battle-surface.is-start-screen .battle-control-row {
     justify-content: center;
+    gap: 20px;
   }
 
   .battle-surface.is-start-screen .start-menu-button {
-    min-width: min(78vw, 230px);
-    min-height: 58px;
-    font-size: clamp(1.15rem, 5vw, 1.45rem);
+    min-width: min(82vw, 280px);
+    min-height: 64px;
+    font-size: clamp(1.25rem, 5.4vw, 1.62rem);
   }
 }
 
