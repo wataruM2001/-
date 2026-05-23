@@ -151,7 +151,7 @@ button {
 .battle-surface.is-start-screen .self-hand-area {
   left: clamp(28px, 28vw, 420px);
   right: auto;
-  top: 56%;
+  top: 50%;
   bottom: auto;
   z-index: 3;
   width: auto;
@@ -162,12 +162,23 @@ button {
 }
 
 .battle-surface.is-start-screen .battle-control-row {
+  flex-direction: column;
+  align-items: center;
   justify-content: flex-start;
+  gap: clamp(14px, 2vh, 20px);
   width: auto;
   pointer-events: none;
 }
 
-.battle-surface.is-start-screen .battle-start-button {
+.start-menu-secondary {
+  display: none;
+}
+
+.battle-surface.is-start-screen .start-menu-secondary {
+  display: block;
+}
+
+.battle-surface.is-start-screen .start-menu-button {
   min-width: clamp(230px, 24vw, 320px);
   min-height: clamp(62px, 7vw, 82px);
   padding: 0 clamp(28px, 3.2vw, 44px);
@@ -217,6 +228,24 @@ button {
     0 12px 28px rgba(0, 0, 0, 0.48);
 }
 
+.battle-surface.is-start-screen .start-menu-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+  filter: saturate(0.56) brightness(0.66);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.34),
+    0 5px 0 rgba(35, 0, 0, 0.9),
+    0 12px 26px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.battle-surface.is-start-screen .start-menu-button:disabled:hover,
+.battle-surface.is-start-screen .start-menu-button:disabled:active {
+  transform: none;
+  filter: saturate(0.56) brightness(0.66);
+}
+
 @media (max-width: 700px) {
   .battle-surface.is-start-screen .self-hand-area {
     left: 50%;
@@ -230,7 +259,7 @@ button {
     justify-content: center;
   }
 
-  .battle-surface.is-start-screen .battle-start-button {
+  .battle-surface.is-start-screen .start-menu-button {
     min-width: min(78vw, 230px);
     min-height: 58px;
     font-size: clamp(1.15rem, 5vw, 1.45rem);
