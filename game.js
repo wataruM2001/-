@@ -562,15 +562,27 @@
     return cloneTiles(gameState?.drawWall || gameState?.wall || []).filter((tile) => waits.has(tileBaseId(tile))).length;
   }
 
-  function countWinningTilesInDrawableTiles(playerOrWinningTileBaseIds, gameState) {
+  function drawableAndRinshanTiles(gameState) {
+    return [
+      ...cloneTiles(gameState?.drawWall || gameState?.wall || []),
+      ...cloneTiles(gameState?.rinshanTiles || []),
+    ];
+  }
+
+  function countWinningTilesInDrawableAndRinshanTiles(playerOrWinningTileBaseIds, gameState) {
     const winningTileBaseIds = Array.isArray(playerOrWinningTileBaseIds)
       ? playerOrWinningTileBaseIds
       : getWinningTiles(playerOrWinningTileBaseIds);
-    return countWinningTilesInDrawWall(winningTileBaseIds, gameState);
+    const waits = new Set(winningTileBaseIds);
+    return drawableAndRinshanTiles(gameState).filter((tile) => waits.has(tileBaseId(tile))).length;
+  }
+
+  function countWinningTilesInDrawableTiles(playerOrWinningTileBaseIds, gameState) {
+    return countWinningTilesInDrawableAndRinshanTiles(playerOrWinningTileBaseIds, gameState);
   }
 
   function riichiOptionRemainingWinningTileCount(option, gameState) {
-    return countWinningTilesInDrawableTiles(option?.waits || [], gameState);
+    return countWinningTilesInDrawableAndRinshanTiles(option?.waits || [], gameState);
   }
 
   function cpuRiichiOptions(player, gameState) {
@@ -582,6 +594,310 @@
 
   function shouldCpuRiichi(player, gameState) {
     return cpuRiichiOptions(player, gameState).length > 0;
+  }
+
+  function discardCandidatesForPlayer(player, gameState) {
+    if (!player || player.hand.length === 0) return [];
+    const playerIndex = gameState?.players?.indexOf(player) ?? -1;
+    const riichiOptions =
+      gameState?.riichiDeclaration?.playerIndex === playerIndex
+        ? gameState.riichiDeclaration.options || []
+        : null;
+    if (!riichiOptions) return cloneTiles(player.hand);
+    const eligibleRiichiOptions = riichiOptions.filter(
+      (option) => riichiOptionRemainingWinningTileCount(option, gameState) >= 2
+    );
+    const legalTileIds = new Set(
+      (eligibleRiichiOptions.length > 0 ? eligibleRiichiOptions : riichiOptions).map((option) => option.tileId)
+    );
+    return cloneTiles(player.hand).filter((tile) => legalTileIds.has(tile.id));
+  }
+
+  function playerAfterDiscard(player, discardTile) {
+    return {
+      ...player,
+      hand: removeTileById(player?.hand || [], discardTile?.id),
+    };
+  }
+
+  function edgeDiscardPriority(tile) {
+    const suit = tileSuit(tile);
+    const number = tileNumber(tile);
+    if (suit === "honor") return 1;
+    if (number === 1 || number === 9) return 2;
+    if (number === 2 || number === 8) return 3;
+    if (number === 3 || number === 7) return 4;
+    if (number === 4 || number === 6) return 5;
+    if (number === 5) return 6;
+    return 99;
+  }
+
+  function countAcceptanceTilesAfterDiscard(player, discardTile, gameState) {
+    const afterDiscard = playerAfterDiscard(player, discardTile);
+    const shantenAfterDiscard = estimateShanten(afterDiscard);
+    return drawableAndRinshanTiles(gameState).filter((drawTileCandidate) => {
+      const afterDraw = {
+        ...afterDiscard,
+        hand: [...cloneTiles(afterDiscard.hand), cloneTile(drawTileCandidate)],
+      };
+      return estimateShanten(afterDraw) <= shantenAfterDiscard - 1;
+    }).length;
+  }
+
+  function chooseLegacyCpuDiscard(candidates, player, gameState, random = Math.random) {
+    const playerIndex = gameState?.players?.indexOf(player) ?? -1;
+    const ranked = cloneTiles(candidates).map((tile) => {
+      const trialPlayer = playerAfterDiscard(player, tile);
+      return {
+        tile,
+        shanten: estimateShanten(trialPlayer),
+        isolatedPriority: isolatedTileDiscardPriority(tile, player.hand, gameState, playerIndex),
+        tieBreaker: random(),
+      };
+    });
+
+    ranked.sort((left, right) => {
+      if (left.shanten !== right.shanten) return left.shanten - right.shanten;
+      if (left.isolatedPriority !== right.isolatedPriority) return left.isolatedPriority - right.isolatedPriority;
+      return left.tieBreaker - right.tieBreaker;
+    });
+    return ranked[0]?.tile || candidates[0] || null;
+  }
+
+  function chooseMaxAcceptanceDiscard(candidates, player, gameState, random = Math.random) {
+    const ranked = cloneTiles(candidates).map((tile) => {
+      const trialPlayer = playerAfterDiscard(player, tile);
+      return {
+        tile,
+        shanten: estimateShanten(trialPlayer),
+        acceptance: countAcceptanceTilesAfterDiscard(player, tile, gameState),
+        edgePriority: edgeDiscardPriority(tile),
+        tieBreaker: random(),
+      };
+    });
+    if (ranked.length === 0) return null;
+    const minShanten = Math.min(...ranked.map((entry) => entry.shanten));
+    const shantenFiltered = ranked.filter((entry) => entry.shanten === minShanten);
+    const maxAcceptance = Math.max(...shantenFiltered.map((entry) => entry.acceptance));
+    return shantenFiltered
+      .filter((entry) => entry.acceptance === maxAcceptance)
+      .sort((left, right) => {
+        if (left.edgePriority !== right.edgePriority) return left.edgePriority - right.edgePriority;
+        return left.tieBreaker - right.tieBreaker;
+      })[0]?.tile || null;
+  }
+
+  function chooseStandardCpuDiscard(player, gameState, random = Math.random) {
+    const candidates = discardCandidatesForPlayer(player, gameState);
+    if (candidates.length === 0) return null;
+    if (estimateShanten(player) <= 1) {
+      return chooseMaxAcceptanceDiscard(candidates, player, gameState, random);
+    }
+    return chooseLegacyCpuDiscard(candidates, player, gameState, random);
+  }
+
+  function discardTilesOf(player) {
+    return cloneTiles((player?.discards || []).map(tileFromDiscard));
+  }
+
+  function isMiddlePin(tile) {
+    return tileSuit(tile) === "pin" && Number(tileNumber(tile)) >= 2 && Number(tileNumber(tile)) <= 8;
+  }
+
+  function isMiddleSou(tile) {
+    return tileSuit(tile) === "sou" && Number(tileNumber(tile)) >= 2 && Number(tileNumber(tile)) <= 8;
+  }
+
+  function isDangerousPlayer(player, gameState) {
+    if (!player) return false;
+    if (player.isRiichi) return true;
+    if (isMenzen(player)) return false;
+    const discards = discardTilesOf(player);
+    return discards.some(isMiddlePin) && discards.some(isMiddleSou);
+  }
+
+  function opponentEntriesFor(player, gameState) {
+    const playerIndex = gameState?.players?.indexOf(player) ?? -1;
+    return (gameState?.players || [])
+      .map((opponent, index) => ({ player: opponent, index }))
+      .filter((entry) => entry.player && entry.index !== playerIndex);
+  }
+
+  function dangerousOpponentEntriesFor(player, gameState) {
+    return opponentEntriesFor(player, gameState).filter((entry) => isDangerousPlayer(entry.player, gameState));
+  }
+
+  function shouldUseSpecialCpuMode(player, gameState) {
+    const remainingDraws = Number(gameState?.remainingDraws) || 0;
+    if (remainingDraws < 30) return true;
+    if (remainingDraws <= 45 && dangerousOpponentEntriesFor(player, gameState).length > 0) return true;
+    return false;
+  }
+
+  function maxCompletedMeldsFromCounts(counts) {
+    const memo = new Map();
+
+    function walk(currentCounts) {
+      const first = sortedCountBaseIds(currentCounts)[0];
+      if (!first) return 0;
+      const key = sortedCountBaseIds(currentCounts)
+        .map((baseId) => `${baseId}:${currentCounts.get(baseId)}`)
+        .join(",");
+      if (memo.has(key)) return memo.get(key);
+
+      let best = 0;
+      const count = currentCounts.get(first) || 0;
+      if (count >= 3) {
+        addCount(currentCounts, first, -3);
+        best = Math.max(best, 1 + walk(currentCounts));
+        addCount(currentCounts, first, 3);
+      }
+      const sequence = canMakeSequenceFrom(first, currentCounts);
+      if (sequence) {
+        sequence.forEach((baseId) => addCount(currentCounts, baseId, -1));
+        best = Math.max(best, 1 + walk(currentCounts));
+        sequence.forEach((baseId) => addCount(currentCounts, baseId, 1));
+      }
+      addCount(currentCounts, first, -1);
+      best = Math.max(best, walk(currentCounts));
+      addCount(currentCounts, first, 1);
+      memo.set(key, best);
+      return best;
+    }
+
+    return walk(new Map(counts));
+  }
+
+  function countCompletedMeldsInHand(tiles = []) {
+    return maxCompletedMeldsFromCounts(countByBaseId(tiles));
+  }
+
+  function countCompletedMeldsForCpu(player) {
+    return (player?.melds || []).length + countCompletedMeldsInHand(player?.hand || []);
+  }
+
+  function isRonDangerTile(tile, player, gameState) {
+    return opponentEntriesFor(player, gameState).some((entry) => canRon(entry.player, tile, gameState));
+  }
+
+  function removeRonDangerTiles(candidates, player, gameState) {
+    return cloneTiles(candidates).filter((tile) => !isRonDangerTile(tile, player, gameState));
+  }
+
+  function dangerousGenbutsuCount(tile, player, gameState) {
+    const baseId = tileBaseId(tile);
+    return dangerousOpponentEntriesFor(player, gameState).filter((entry) =>
+      discardTilesOf(entry.player).some((discard) => tileBaseId(discard) === baseId)
+    ).length;
+  }
+
+  function opponentDiscardedSameHonor(tile, player, gameState) {
+    if (tileSuit(tile) !== "honor") return false;
+    const baseId = tileBaseId(tile);
+    return opponentEntriesFor(player, gameState).some((entry) =>
+      discardTilesOf(entry.player).some((discard) => tileBaseId(discard) === baseId)
+    );
+  }
+
+  function visibleBaseCount(baseId, player, gameState) {
+    const visibleTiles = [
+      ...cloneTiles(player?.hand || []),
+      ...cloneTiles(player?.flowers || []),
+      ...meldTiles(player),
+      ...cloneTiles(gameState?.doraIndicators || []),
+      ...cloneTiles(gameState?.uraDoraIndicators || []),
+      ...(gameState?.players || []).flatMap((entry) => [
+        ...discardTilesOf(entry),
+        ...cloneTiles(entry.flowers || []),
+        ...meldTiles(entry),
+      ]),
+    ];
+    return visibleTiles.filter((tile) => tileBaseId(tile) === baseId).length;
+  }
+
+  function manyVisibleHonor(tile, player, gameState) {
+    return tileSuit(tile) === "honor" && visibleBaseCount(tileBaseId(tile), player, gameState) >= 2;
+  }
+
+  function noChanceTile(tile, player, gameState) {
+    const suit = tileSuit(tile);
+    const number = tileNumber(tile);
+    if (!["pin", "sou"].includes(suit) || !Number.isInteger(number)) return false;
+    const prefix = suit === "pin" ? "p" : "s";
+    const starts = [number - 2, number - 1, number].filter((start) => start >= 1 && start <= 7);
+    if (starts.length === 0) return false;
+    return starts.every((start) => {
+      const sequenceIds = [start, start + 1, start + 2].map((value) => `${prefix}${value}`);
+      return sequenceIds
+        .filter((baseId) => baseId !== tileBaseId(tile))
+        .some((baseId) => visibleBaseCount(baseId, player, gameState) >= 4);
+    });
+  }
+
+  function isTerminalTile(tile) {
+    const suit = tileSuit(tile);
+    const number = tileNumber(tile);
+    return ["man", "pin", "sou"].includes(suit) && (number === 1 || number === 9);
+  }
+
+  function defensivePriority(tile, player, gameState) {
+    const genbutsuCount = dangerousGenbutsuCount(tile, player, gameState);
+    if (genbutsuCount > 0) return { priority: 1, genbutsuCount };
+    if (opponentDiscardedSameHonor(tile, player, gameState) || manyVisibleHonor(tile, player, gameState) || noChanceTile(tile, player, gameState)) {
+      return { priority: 2, genbutsuCount: 0 };
+    }
+    if (isTerminalTile(tile)) return { priority: 3, genbutsuCount: 0 };
+    return { priority: 4, genbutsuCount: 0 };
+  }
+
+  function chooseByDefensivePriority(candidates, player, gameState, random = Math.random) {
+    const ranked = cloneTiles(candidates).map((tile) => {
+      const defense = defensivePriority(tile, player, gameState);
+      return {
+        tile,
+        priority: defense.priority,
+        genbutsuCount: defense.genbutsuCount,
+        acceptance: countAcceptanceTilesAfterDiscard(player, tile, gameState),
+        edgePriority: edgeDiscardPriority(tile),
+        tieBreaker: random(),
+      };
+    });
+    if (ranked.length === 0) return null;
+    const minPriority = Math.min(...ranked.map((entry) => entry.priority));
+    const filtered = ranked.filter((entry) => entry.priority === minPriority);
+    if (minPriority === 4) {
+      return chooseMaxAcceptanceDiscard(filtered.map((entry) => entry.tile), player, gameState, random);
+    }
+    return filtered.sort((left, right) => {
+      if (left.genbutsuCount !== right.genbutsuCount) return right.genbutsuCount - left.genbutsuCount;
+      if (left.edgePriority !== right.edgePriority) return left.edgePriority - right.edgePriority;
+      if (left.acceptance !== right.acceptance) return right.acceptance - left.acceptance;
+      return left.tieBreaker - right.tieBreaker;
+    })[0]?.tile || null;
+  }
+
+  function chooseDefensiveDiscard(player, gameState, random = Math.random) {
+    const allCandidates = discardCandidatesForPlayer(player, gameState);
+    if (allCandidates.length === 0) return null;
+    const safeCandidates = removeRonDangerTiles(allCandidates, player, gameState);
+    const candidates = safeCandidates.length > 0 ? safeCandidates : allCandidates;
+    return chooseByDefensivePriority(candidates, player, gameState, random);
+  }
+
+  function chooseSpecialCpuDiscard(player, gameState, random = Math.random) {
+    const completedMeldCount = countCompletedMeldsForCpu(player);
+    if (completedMeldCount <= 1) {
+      return chooseDefensiveDiscard(player, gameState, random);
+    }
+    return chooseMaxAcceptanceDiscard(discardCandidatesForPlayer(player, gameState), player, gameState, random);
+  }
+
+  function chooseCpuDiscard(player, gameState, random = Math.random) {
+    if (!player || player.hand.length === 0) return null;
+    if (shouldUseSpecialCpuMode(player, gameState)) {
+      return chooseSpecialCpuDiscard(player, gameState, random);
+    }
+    return chooseStandardCpuDiscard(player, gameState, random);
   }
 
   function canRon(player, discardTile, gameState) {
@@ -1591,40 +1907,7 @@
   }
 
   function decideCpuDiscard(player, gameState, random = Math.random) {
-    if (!player || player.hand.length === 0) {
-      return null;
-    }
-    const playerIndex = gameState?.players?.indexOf(player) ?? -1;
-    const riichiOptions =
-      gameState?.riichiDeclaration?.playerIndex === playerIndex
-        ? gameState.riichiDeclaration.options || []
-        : null;
-    const eligibleRiichiOptions = riichiOptions
-      ? riichiOptions.filter((option) => riichiOptionRemainingWinningTileCount(option, gameState) >= 2)
-      : null;
-    const legalRiichiTileIds = riichiOptions
-      ? new Set((eligibleRiichiOptions.length > 0 ? eligibleRiichiOptions : riichiOptions).map((option) => option.tileId))
-      : null;
-    const candidates = player.hand.filter((tile) => !legalRiichiTileIds || legalRiichiTileIds.has(tile.id));
-    if (candidates.length === 0) return null;
-
-    const ranked = candidates.map((tile) => {
-      const trialHand = removeTileById(player.hand, tile.id);
-      const trialPlayer = { ...player, hand: trialHand };
-      return {
-        tile,
-        shanten: estimateShanten(trialPlayer),
-        isolatedPriority: isolatedTileDiscardPriority(tile, player.hand, gameState, playerIndex),
-        tieBreaker: random(),
-      };
-    });
-
-    ranked.sort((left, right) => {
-      if (left.shanten !== right.shanten) return left.shanten - right.shanten;
-      if (left.isolatedPriority !== right.isolatedPriority) return left.isolatedPriority - right.isolatedPriority;
-      return left.tieBreaker - right.tieBreaker;
-    });
-    return ranked[0]?.tile || null;
+    return chooseCpuDiscard(player, gameState, random);
   }
 
   function endHandAsRyukyoku(gameState) {
@@ -1698,7 +1981,18 @@
     canDiscardDuringActionPending,
     skipOptionalSelfActionsBeforeDiscard,
     getWinningTiles,
+    countWinningTilesInDrawableAndRinshanTiles,
     countWinningTilesInDrawableTiles,
+    chooseCpuDiscard,
+    shouldUseSpecialCpuMode,
+    isDangerousPlayer,
+    countCompletedMeldsForCpu,
+    chooseStandardCpuDiscard,
+    chooseSpecialCpuDiscard,
+    chooseDefensiveDiscard,
+    removeRonDangerTiles,
+    chooseMaxAcceptanceDiscard,
+    countAcceptanceTilesAfterDiscard,
     shouldCpuRiichi,
     getAvailableActions,
     shouldAutoTsumogiriAfterRiichi,
