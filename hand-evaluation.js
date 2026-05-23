@@ -701,6 +701,9 @@
     if (suit === "man") {
       return number === 1 ? "m9" : "m1";
     }
+    if (suit === "flower" || baseId === "flower") {
+      return "flower";
+    }
     const windIndex = WIND_ORDER.indexOf(baseId);
     if (windIndex >= 0) return WIND_ORDER[(windIndex + 1) % WIND_ORDER.length];
     const dragonIndex = DRAGON_ORDER.indexOf(baseId);
@@ -710,7 +713,8 @@
 
   function countDoraFromIndicators(allTiles, indicators = []) {
     const doraBaseIds = indicators.slice(0, MAX_DORA_INDICATORS).map(nextDoraBaseId).filter(Boolean);
-    const han = shapeTiles(allTiles).reduce((sum, tile) => sum + doraBaseIds.filter((baseId) => tileBaseId(tile) === baseId).length, 0);
+    const tiles = Array.isArray(allTiles) ? allTiles.filter(Boolean) : [];
+    const han = tiles.reduce((sum, tile) => sum + doraBaseIds.filter((baseId) => tileBaseId(tile) === baseId).length, 0);
     return {
       han,
       doraBaseIds,
