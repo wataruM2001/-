@@ -1599,14 +1599,14 @@ input[type="checkbox"] {
 
 .kamicha-score {
   left: 24px;
-  top: calc(50% - var(--center-river-tile-long));
+  top: calc(50% - var(--center-river-tile-long) + 10px);
   transform-origin: left center;
   transform: translateY(-50%) rotate(90deg);
 }
 
 .shimocha-score {
   right: 24px;
-  top: calc(50% - var(--center-river-tile-long));
+  top: calc(50% - var(--center-river-tile-long) + 10px);
   transform-origin: right center;
   transform: translateY(-50%) rotate(-90deg);
 }
@@ -1718,7 +1718,7 @@ input[type="checkbox"] {
 .round-title-block {
   position: absolute;
   left: 50%;
-  top: calc(50% - 20px);
+  top: calc(50% - 10px);
   width: calc(var(--center-river-tile-width) * 3);
   transform: translate(-50%, -50%);
   display: grid;
