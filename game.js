@@ -270,6 +270,32 @@
     return (suit === "pin" || suit === "sou") && Number(number) >= 2 && Number(number) <= 8;
   }
 
+  function tileSuit(tileOrBaseId) {
+    const baseId = typeof tileOrBaseId === "string" ? tileOrBaseId : tileBaseId(tileOrBaseId);
+    const definition = Tiles?.getTileDefinition?.(tileOrBaseId) || Tiles?.getTileDefinition?.(baseId);
+    if (definition?.suit) return definition.suit;
+    if (/^m\d$/.test(baseId)) return "man";
+    if (/^p\d$/.test(baseId)) return "pin";
+    if (/^s\d$/.test(baseId)) return "sou";
+    if (["east", "south", "west", "north", "white", "green", "red"].includes(baseId)) return "honor";
+    return "";
+  }
+
+  function tileNumber(tileOrBaseId) {
+    const baseId = typeof tileOrBaseId === "string" ? tileOrBaseId : tileBaseId(tileOrBaseId);
+    const definition = Tiles?.getTileDefinition?.(tileOrBaseId) || Tiles?.getTileDefinition?.(baseId);
+    if (Number.isInteger(definition?.number)) return definition.number;
+    const match = String(baseId).match(/^[mps](\d)$/);
+    return match ? Number(match[1]) : null;
+  }
+
+  function windBaseIdForWind(wind) {
+    if (wind === "east") return "east";
+    if (wind === "south") return "south";
+    if (wind === "west") return "west";
+    return "";
+  }
+
   function sameBaseTiles(tiles, baseId) {
     return cloneTiles(tiles).filter((tile) => tileBaseId(tile) === baseId);
   }
@@ -338,6 +364,224 @@
   function isFuriten(player, gameState, winningTiles = getWinningTiles(player)) {
     const waits = new Set(winningTiles);
     return (player?.discards || []).some((discard) => waits.has(tileBaseId(tileFromDiscard(discard))));
+  }
+
+  function baseSortValue(baseId) {
+    const suitOrder = { pin: 0, sou: 1, honor: 2, man: 3 };
+    const honorOrder = { east: 1, south: 2, west: 3, north: 4, white: 5, green: 6, red: 7 };
+    const suit = tileSuit(baseId);
+    const number = suit === "honor" ? honorOrder[baseId] || 99 : tileNumber(baseId) || 99;
+    return (suitOrder[suit] ?? 9) * 100 + number;
+  }
+
+  function countByBaseId(tiles = []) {
+    return cloneTiles(tiles)
+      .filter((tile) => !tile.isFlower)
+      .reduce((counts, tile) => {
+        const baseId = tileBaseId(tile);
+        counts.set(baseId, (counts.get(baseId) || 0) + 1);
+        return counts;
+      }, new Map());
+  }
+
+  function sortedCountBaseIds(counts) {
+    return [...counts.keys()]
+      .filter((baseId) => (counts.get(baseId) || 0) > 0)
+      .sort((left, right) => baseSortValue(left) - baseSortValue(right));
+  }
+
+  function countKey(counts, meldCount, taatsuCount, hasPair) {
+    return `${meldCount}|${taatsuCount}|${hasPair ? 1 : 0}|${sortedCountBaseIds(counts)
+      .map((baseId) => `${baseId}:${counts.get(baseId)}`)
+      .join(",")}`;
+  }
+
+  function addCount(counts, baseId, amount) {
+    counts.set(baseId, (counts.get(baseId) || 0) + amount);
+  }
+
+  function canMakeSequenceFrom(baseId, counts) {
+    const suit = tileSuit(baseId);
+    const number = tileNumber(baseId);
+    if (!["pin", "sou"].includes(suit) || !Number.isInteger(number) || number > 7) return null;
+    const prefix = suit === "pin" ? "p" : "s";
+    const second = `${prefix}${number + 1}`;
+    const third = `${prefix}${number + 2}`;
+    return (counts.get(second) || 0) > 0 && (counts.get(third) || 0) > 0 ? [baseId, second, third] : null;
+  }
+
+  function taatsuCandidatesFrom(baseId, counts) {
+    const suit = tileSuit(baseId);
+    const number = tileNumber(baseId);
+    if (!["pin", "sou"].includes(suit) || !Number.isInteger(number)) return [];
+    const prefix = suit === "pin" ? "p" : "s";
+    return [1, 2]
+      .map((offset) => `${prefix}${number + offset}`)
+      .filter((nextBaseId) => (counts.get(nextBaseId) || 0) > 0);
+  }
+
+  function estimateStandardShanten(tiles = [], meldCount = 0) {
+    const counts = countByBaseId(tiles);
+    const memo = new Map();
+
+    function walk(currentCounts, currentMelds, currentTaatsu, hasPair) {
+      const first = sortedCountBaseIds(currentCounts)[0];
+      if (!first) {
+        const usableTaatsu = Math.min(currentTaatsu, Math.max(0, 4 - currentMelds));
+        return 8 - currentMelds * 2 - usableTaatsu - (hasPair ? 1 : 0);
+      }
+
+      const key = countKey(currentCounts, currentMelds, currentTaatsu, hasPair);
+      if (memo.has(key)) return memo.get(key);
+
+      let best = 8;
+      const count = currentCounts.get(first) || 0;
+
+      if (count >= 3) {
+        addCount(currentCounts, first, -3);
+        best = Math.min(best, walk(currentCounts, currentMelds + 1, currentTaatsu, hasPair));
+        addCount(currentCounts, first, 3);
+      }
+
+      const sequence = canMakeSequenceFrom(first, currentCounts);
+      if (sequence) {
+        sequence.forEach((baseId) => addCount(currentCounts, baseId, -1));
+        best = Math.min(best, walk(currentCounts, currentMelds + 1, currentTaatsu, hasPair));
+        sequence.forEach((baseId) => addCount(currentCounts, baseId, 1));
+      }
+
+      if (count >= 2) {
+        addCount(currentCounts, first, -2);
+        if (!hasPair) best = Math.min(best, walk(currentCounts, currentMelds, currentTaatsu, true));
+        best = Math.min(best, walk(currentCounts, currentMelds, currentTaatsu + 1, hasPair));
+        addCount(currentCounts, first, 2);
+      }
+
+      taatsuCandidatesFrom(first, currentCounts).forEach((second) => {
+        addCount(currentCounts, first, -1);
+        addCount(currentCounts, second, -1);
+        best = Math.min(best, walk(currentCounts, currentMelds, currentTaatsu + 1, hasPair));
+        addCount(currentCounts, second, 1);
+        addCount(currentCounts, first, 1);
+      });
+
+      addCount(currentCounts, first, -1);
+      best = Math.min(best, walk(currentCounts, currentMelds, currentTaatsu, hasPair));
+      addCount(currentCounts, first, 1);
+
+      memo.set(key, best);
+      return best;
+    }
+
+    return Math.max(-1, walk(counts, meldCount, 0, false));
+  }
+
+  function estimateChiitoitsuShanten(tiles = []) {
+    const counts = countByBaseId(tiles);
+    let pairUnits = 0;
+    let usableUnits = 0;
+    counts.forEach((count) => {
+      pairUnits += Math.floor(count / 2);
+      usableUnits += Math.floor(count / 2) + (count % 2 > 0 ? 1 : 0);
+    });
+    return 6 - pairUnits + Math.max(0, 7 - usableUnits);
+  }
+
+  function estimateKokushiShanten(tiles = []) {
+    const terminalHonorIds = new Set(["m1", "m9", "p1", "p9", "s1", "s9", "east", "south", "west", "north", "white", "green", "red"]);
+    const counts = countByBaseId(tiles);
+    let unique = 0;
+    let hasPair = false;
+    terminalHonorIds.forEach((baseId) => {
+      const count = counts.get(baseId) || 0;
+      if (count > 0) unique += 1;
+      if (count >= 2) hasPair = true;
+    });
+    return 13 - unique - (hasPair ? 1 : 0);
+  }
+
+  function estimateShanten(player) {
+    const meldCount = (player?.melds || []).length;
+    const hand = cloneTiles(player?.hand || []);
+    const values = [estimateStandardShanten(hand, meldCount)];
+    if (meldCount === 0) {
+      values.push(estimateChiitoitsuShanten(hand));
+      values.push(estimateKokushiShanten(hand));
+    }
+    return Math.min(...values);
+  }
+
+  function isYakuhaiBaseId(baseId, gameState, playerIndex) {
+    if (["white", "green", "red", "north"].includes(baseId)) return true;
+    const roundWindBaseId = windBaseIdForWind(gameState?.roundWind);
+    const seatWindBaseId = windBaseIdForWind(seatWindForIndex(gameState, playerIndex));
+    return Boolean(baseId && (baseId === roundWindBaseId || baseId === seatWindBaseId));
+  }
+
+  function isOtateWindBaseId(baseId, gameState, playerIndex) {
+    return ["east", "south", "west"].includes(baseId) && !isYakuhaiBaseId(baseId, gameState, playerIndex);
+  }
+
+  function isIsolatedTile(tile, hand = []) {
+    const baseId = tileBaseId(tile);
+    const counts = countByBaseId(hand);
+    if ((counts.get(baseId) || 0) >= 2) return false;
+    const suit = tileSuit(tile);
+    if (suit === "honor" || suit === "man") return true;
+    if (!["pin", "sou"].includes(suit)) return false;
+    const number = tileNumber(tile);
+    if (!Number.isInteger(number)) return false;
+    const prefix = suit === "pin" ? "p" : "s";
+    return [number - 1, number + 1]
+      .filter((neighbor) => neighbor >= 1 && neighbor <= 9)
+      .every((neighbor) => (counts.get(`${prefix}${neighbor}`) || 0) === 0);
+  }
+
+  function isolatedTileDiscardPriority(tile, hand, gameState, playerIndex) {
+    if (!isIsolatedTile(tile, hand)) return 999;
+    const baseId = tileBaseId(tile);
+    const suit = tileSuit(tile);
+    const number = tileNumber(tile);
+    if (isOtateWindBaseId(baseId, gameState, playerIndex) || suit === "man") return 1;
+    if (isYakuhaiBaseId(baseId, gameState, playerIndex)) return 2;
+    if (number === 1 || number === 9) return 3;
+    if (number === 2 || number === 8) return 4;
+    if (Number(number) >= 3 && Number(number) <= 7) return 5;
+    return 999;
+  }
+
+  function removeTileById(tiles = [], tileId = "") {
+    const next = cloneTiles(tiles);
+    const index = next.findIndex((tile) => tile.id === tileId);
+    if (index >= 0) next.splice(index, 1);
+    return next;
+  }
+
+  function countWinningTilesInDrawWall(winningTileBaseIds = [], gameState) {
+    const waits = new Set(winningTileBaseIds);
+    return cloneTiles(gameState?.drawWall || gameState?.wall || []).filter((tile) => waits.has(tileBaseId(tile))).length;
+  }
+
+  function countWinningTilesInDrawableTiles(playerOrWinningTileBaseIds, gameState) {
+    const winningTileBaseIds = Array.isArray(playerOrWinningTileBaseIds)
+      ? playerOrWinningTileBaseIds
+      : getWinningTiles(playerOrWinningTileBaseIds);
+    return countWinningTilesInDrawWall(winningTileBaseIds, gameState);
+  }
+
+  function riichiOptionRemainingWinningTileCount(option, gameState) {
+    return countWinningTilesInDrawableTiles(option?.waits || [], gameState);
+  }
+
+  function cpuRiichiOptions(player, gameState) {
+    if (!player?.isCpu || !canRiichi(player, gameState)) return [];
+    return riichiDiscardOptions(player, gameState).filter(
+      (option) => riichiOptionRemainingWinningTileCount(option, gameState) >= 2
+    );
+  }
+
+  function shouldCpuRiichi(player, gameState) {
+    return cpuRiichiOptions(player, gameState).length > 0;
   }
 
   function canRon(player, discardTile, gameState) {
@@ -1200,6 +1444,9 @@
       if (canTsumo(player, next)) {
         return resolveWin(next, { winType: "tsumo", winnerIndex: next.currentPlayerIndex });
       }
+      if (shouldCpuRiichi(player, next)) {
+        return startRiichiDeclaration(next, next.currentPlayerIndex);
+      }
       return syncDrawWallState(next);
     }
 
@@ -1347,8 +1594,37 @@
     if (!player || player.hand.length === 0) {
       return null;
     }
-    const index = Math.floor(random() * player.hand.length);
-    return player.hand[index];
+    const playerIndex = gameState?.players?.indexOf(player) ?? -1;
+    const riichiOptions =
+      gameState?.riichiDeclaration?.playerIndex === playerIndex
+        ? gameState.riichiDeclaration.options || []
+        : null;
+    const eligibleRiichiOptions = riichiOptions
+      ? riichiOptions.filter((option) => riichiOptionRemainingWinningTileCount(option, gameState) >= 2)
+      : null;
+    const legalRiichiTileIds = riichiOptions
+      ? new Set((eligibleRiichiOptions.length > 0 ? eligibleRiichiOptions : riichiOptions).map((option) => option.tileId))
+      : null;
+    const candidates = player.hand.filter((tile) => !legalRiichiTileIds || legalRiichiTileIds.has(tile.id));
+    if (candidates.length === 0) return null;
+
+    const ranked = candidates.map((tile) => {
+      const trialHand = removeTileById(player.hand, tile.id);
+      const trialPlayer = { ...player, hand: trialHand };
+      return {
+        tile,
+        shanten: estimateShanten(trialPlayer),
+        isolatedPriority: isolatedTileDiscardPriority(tile, player.hand, gameState, playerIndex),
+        tieBreaker: random(),
+      };
+    });
+
+    ranked.sort((left, right) => {
+      if (left.shanten !== right.shanten) return left.shanten - right.shanten;
+      if (left.isolatedPriority !== right.isolatedPriority) return left.isolatedPriority - right.isolatedPriority;
+      return left.tieBreaker - right.tieBreaker;
+    });
+    return ranked[0]?.tile || null;
   }
 
   function endHandAsRyukyoku(gameState) {
@@ -1422,6 +1698,8 @@
     canDiscardDuringActionPending,
     skipOptionalSelfActionsBeforeDiscard,
     getWinningTiles,
+    countWinningTilesInDrawableTiles,
+    shouldCpuRiichi,
     getAvailableActions,
     shouldAutoTsumogiriAfterRiichi,
     handleRiichiDraw,
