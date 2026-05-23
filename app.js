@@ -1043,50 +1043,43 @@
       .join("");
   }
 
+  function formatResultPointDelta(value) {
+    const number = Number(value) || 0;
+    if (number > 0) return `+${number.toLocaleString("ja-JP")}点`;
+    if (number < 0) return `${number.toLocaleString("ja-JP")}点`;
+    return "0点";
+  }
+
+  function formatResultChipDelta(value) {
+    const number = Number(value) || 0;
+    if (number > 0) return `+${number}pt`;
+    if (number < 0) return `${number}pt`;
+    return "0pt";
+  }
+
+  function renderSimpleBattleResultRows(result) {
+    const seats = [
+      ["self", "自分"],
+      ["shimocha", "下家"],
+      ["kamicha", "上家"],
+    ];
+    return seats
+      .map(([seat, label]) => {
+        const pointText = formatResultPointDelta(result.pointChanges?.[seat]);
+        const chipText = formatResultChipDelta(result.chipChanges?.[seat]);
+        return `<div class="result-player-row">${escapeHtml(label)} ${escapeHtml(pointText)} ,${escapeHtml(chipText)}</div>`;
+      })
+      .join("");
+  }
+
   function renderBattleResultPanel() {
     if (!els.battleResultPanel || !lastHandResult) return;
     const result = lastHandResult;
-    const action = result.action || {};
-    const winnerName = Number.isInteger(action.winnerIndex) ? battlePlayerName(battleState, action.winnerIndex) : "";
-    const loserName = Number.isInteger(action.discarderIndex) ? battlePlayerName(battleState, action.discarderIndex) : "";
-    const endReasonText = battleEndReasonText(result.endReason);
-    const rankRows = result.rankings
-      .map(
-        (player) =>
-          `<li>${player.rank}位 ${escapeHtml(player.name)} ${Number(player.points).toLocaleString("ja-JP")}点</li>`
-      )
-      .join("");
-
-    els.battleResultTitle.textContent = `${result.roundLabel}${result.honbaBefore}本場 終了`;
+    els.battleResultTitle.textContent = `${result.roundLabel}${result.honbaBefore}本場 供託${result.kyotakuBefore}`;
     els.battleResultBody.innerHTML = `
-      <section>
-        <h3>結果</h3>
-        <p>${escapeHtml(battleResultTypeText(result))}${winnerName ? `：${escapeHtml(winnerName)}` : ""}${loserName ? ` / 放銃：${escapeHtml(loserName)}` : ""}</p>
-      </section>
-      ${
-        result.type === "ryukyoku"
-          ? `<section><h3>聴牌</h3><p>${result.tenpaiPlayerIds.length ? result.tenpaiPlayerIds.map((id) => escapeHtml(battleState.players.find((player) => player.id === id)?.name || id)).join(" / ") : "全員ノーテン"}</p></section>`
-          : ""
-      }
-      <section>
-        <h3>点棒移動</h3>
-        <ul>${renderBattleDeltaRows(result.pointChanges, "点")}</ul>
-      </section>
-      <section>
-        <h3>祝儀</h3>
-        <ul>${renderBattleDeltaRows(result.chipChanges, "pt")}</ul>
-      </section>
-      <section>
-        <h3>供託</h3>
-        <p>${result.kyotakuBefore}本 → ${result.kyotakuAfter}本</p>
-      </section>
-      ${
-        result.requiresOorasuDealerChoice
-          ? `<section><h3>現在順位</h3><ul>${rankRows}</ul><p>親は1位ではないため、続行または終了を選択できます。</p></section>`
-          : ""
-      }
-      ${endReasonText ? `<section><h3>半荘終了理由</h3><p>${escapeHtml(endReasonText)}</p></section>` : ""}
-      ${!result.isHanchanEnded || result.requiresOorasuDealerChoice ? `<section><h3>次局</h3><p>${escapeHtml(result.nextRoundLabel)}</p></section>` : ""}
+      <div class="result-simple">
+        ${renderSimpleBattleResultRows(result)}
+      </div>
     `;
     els.battleConfirmButton.hidden = result.requiresOorasuDealerChoice;
     els.battleContinueButton.hidden = !result.requiresOorasuDealerChoice;
