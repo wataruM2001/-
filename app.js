@@ -1244,6 +1244,13 @@
     return "0pt";
   }
 
+  function resultDeltaClass(value) {
+    const number = Number(value) || 0;
+    if (number > 0) return "result-delta-plus";
+    if (number < 0) return "result-delta-minus";
+    return "result-delta-zero";
+  }
+
   function renderSimpleBattleResultRows(result) {
     const seats = [
       ["self", "自分"],
@@ -1252,9 +1259,11 @@
     ];
     return seats
       .map(([seat, label]) => {
-        const pointText = formatResultPointDelta(result.pointChanges?.[seat]);
-        const chipText = formatResultChipDelta(result.chipChanges?.[seat]);
-        return `<div class="result-player-row">${escapeHtml(label)} ${escapeHtml(pointText)} ,${escapeHtml(chipText)}</div>`;
+        const pointValue = result.pointChanges?.[seat];
+        const chipValue = result.chipChanges?.[seat];
+        const pointText = formatResultPointDelta(pointValue);
+        const chipText = formatResultChipDelta(chipValue);
+        return `<div class="result-player-row">${escapeHtml(label)} <span class="${resultDeltaClass(pointValue)}">${escapeHtml(pointText)}</span> ,<span class="${resultDeltaClass(chipValue)}">${escapeHtml(chipText)}</span></div>`;
       })
       .join("");
   }
