@@ -70,6 +70,7 @@
   let lastBattleEffectSignature = "";
   let autoWinEnabled = true;
   let settlementBreakdownVisible = false;
+  let resultTransparent = false;
 
   const els = {
     undoButton: document.getElementById("undoButton"),
@@ -83,6 +84,7 @@
     battleConfirmButton: document.getElementById("battleConfirmButton"),
     battleContinueButton: document.getElementById("battleContinueButton"),
     battleEndButton: document.getElementById("battleEndButton"),
+    battleTransparentButton: document.getElementById("battleTransparentButton"),
     battleSettlementPanel: document.getElementById("battleSettlementPanel"),
     battleSettlementBody: document.getElementById("battleSettlementBody"),
     battleSettlementDetailButton: document.getElementById("battleSettlementDetailButton"),
@@ -202,6 +204,10 @@
     });
     els.battleEndButton?.addEventListener("click", () => {
       handleEndOorasu();
+    });
+    els.battleTransparentButton?.addEventListener("click", () => {
+      resultTransparent = true;
+      renderBattleScreenPanels();
     });
     els.battleRestartButton?.addEventListener("click", () => {
       startBattleHanchan();
@@ -612,6 +618,7 @@
       clearResultTransitionTimer();
       battleState = applyBattleRyukyokuSettlement(battleState);
       lastHandResult = buildBattleHandResult(battleState);
+      resultTransparent = false;
       appScreen = "result";
       return true;
     }
@@ -620,6 +627,7 @@
       resultTransitionTimer = 0;
       if (!battleState || battleState.phase !== "result" || appScreen !== "playing") return;
       lastHandResult = buildBattleHandResult(battleState);
+      resultTransparent = false;
       appScreen = "result";
       renderBattleTable();
     }, RESULT_TRANSITION_DELAY_MS);
@@ -1394,6 +1402,7 @@
     if (els.battleSettlementPanel) els.battleSettlementPanel.hidden = !isSettlement;
     if (els.battleStartButton) els.battleStartButton.hidden = appScreen !== "start";
     if (els.battleActionButtons) els.battleActionButtons.hidden = appScreen !== "playing";
+    els.battleResultPanel?.classList.toggle("result-transparent", isResult && resultTransparent);
     if (isResult) renderBattleResultPanel();
     if (isSettlement) renderBattleSettlementPanel();
   }
