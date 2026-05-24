@@ -18,7 +18,7 @@
   }
 
   const PLAYER_SEATS = ["self", "shimocha", "kamicha"];
-  const DEFAULT_PLAYER_NAMES = ["Player 1", "CPU Shimocha", "CPU Kamicha"];
+  const DEFAULT_PLAYER_NAMES = ["自分", "下家", "上家"];
   const ACTIONS = ["ron", "tsumo", "pon", "kan", "riichi", "skip"];
 
   const INITIAL_HAND_SIZE = 13;
