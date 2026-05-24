@@ -1099,22 +1099,39 @@
       .join("");
   }
 
+  function setTextIfChanged(element, text) {
+    if (element && element.textContent !== text) element.textContent = text;
+  }
+
+  function setHtmlIfChanged(element, html) {
+    if (element && element.innerHTML !== html) element.innerHTML = html;
+  }
+
+  function setHiddenIfChanged(element, hidden) {
+    if (element && element.hidden !== hidden) element.hidden = hidden;
+  }
+
+  function toggleClassIfChanged(element, className, enabled) {
+    if (!element || element.classList.contains(className) === enabled) return;
+    element.classList.toggle(className, enabled);
+  }
+
   function renderCentralInfoPanel(gameState) {
     if (!gameState) return;
     const kyotakuCount = Math.max(0, Math.floor(Number(gameState.kyotaku) || 0));
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     const dealerPlayer = gameState.players[gameState.dealerIndex];
 
-    els.battleRoundLabel.textContent = `${windText(gameState.roundWind)}${gameState.handNumber}局`;
+    setTextIfChanged(els.battleRoundLabel, `${windText(gameState.roundWind)}${gameState.handNumber}局`);
     if (els.battleHonbaKyotakuLabel) {
-      els.battleHonbaKyotakuLabel.textContent = `${gameState.honba}本場 供託${kyotakuCount} 残${gameState.remainingDraws}`;
+      setTextIfChanged(els.battleHonbaKyotakuLabel, `${gameState.honba}本場 供託${kyotakuCount} 残${gameState.remainingDraws}`);
     }
-    els.battleRemainingDraws.textContent = `残 ${gameState.remainingDraws}`;
-    els.battleDealerLabel.textContent = `親 ${playerPositionLabel(dealerPlayer?.seat)}`;
-    els.battleKyotakuLabel.textContent = `手番 ${playerPositionLabel(currentPlayer?.seat)}`;
-    els.battleDoraIndicators.innerHTML = renderDoraIndicatorRow(gameState.doraIndicators);
+    setTextIfChanged(els.battleRemainingDraws, `残 ${gameState.remainingDraws}`);
+    setTextIfChanged(els.battleDealerLabel, `親 ${playerPositionLabel(dealerPlayer?.seat)}`);
+    setTextIfChanged(els.battleKyotakuLabel, `手番 ${playerPositionLabel(currentPlayer?.seat)}`);
+    setHtmlIfChanged(els.battleDoraIndicators, renderDoraIndicatorRow(gameState.doraIndicators));
     if (els.battlePlayerScores) {
-      els.battlePlayerScores.innerHTML = renderCenterScoreDisplay(gameState.players, gameState.dealerIndex);
+      setHtmlIfChanged(els.battlePlayerScores, renderCenterScoreDisplay(gameState.players, gameState.dealerIndex));
     }
   }
 
@@ -1365,12 +1382,12 @@
   function renderBattleScreenPanels() {
     const isResult = appScreen === "result";
     const isSettlement = appScreen === "settlement";
-    els.battleSurface?.classList.toggle("is-start-screen", appScreen === "start");
-    if (els.battleResultPanel) els.battleResultPanel.hidden = !isResult;
-    if (els.battleSettlementPanel) els.battleSettlementPanel.hidden = !isSettlement;
-    if (els.battleStartButton) els.battleStartButton.hidden = appScreen !== "start";
-    if (els.battleActionButtons) els.battleActionButtons.hidden = appScreen !== "playing";
-    els.battleResultPanel?.classList.toggle("result-transparent", isResult && resultTransparent);
+    toggleClassIfChanged(els.battleSurface, "is-start-screen", appScreen === "start");
+    setHiddenIfChanged(els.battleResultPanel, !isResult);
+    setHiddenIfChanged(els.battleSettlementPanel, !isSettlement);
+    setHiddenIfChanged(els.battleStartButton, appScreen !== "start");
+    setHiddenIfChanged(els.battleActionButtons, appScreen !== "playing");
+    toggleClassIfChanged(els.battleResultPanel, "result-transparent", isResult && resultTransparent);
     if (isResult) renderBattleResultPanel();
     if (isSettlement) renderBattleSettlementPanel();
   }
@@ -1722,36 +1739,36 @@
       (!battleState.riichiDeclaration ||
         battleState.riichiDeclaration.playerIndex === battleState.currentPlayerIndex);
 
-    els.battleSelfName.textContent = displayPlayerNameByIndex(0);
-    els.battleRightName.textContent = displayPlayerNameByIndex(1);
-    els.battleLeftName.textContent = displayPlayerNameByIndex(2);
+    setTextIfChanged(els.battleSelfName, displayPlayerNameByIndex(0));
+    setTextIfChanged(els.battleRightName, displayPlayerNameByIndex(1));
+    setTextIfChanged(els.battleLeftName, displayPlayerNameByIndex(2));
     renderCentralInfoPanel(battleState);
     renderBattleEffect(battleState);
     if (els.battleActionButtons) {
-      els.battleActionButtons.innerHTML = renderBattleActionButtons(battleState);
+      setHtmlIfChanged(els.battleActionButtons, renderBattleActionButtons(battleState));
     }
-    els.battleStatus.textContent = battleStatusText();
-    els.battleStartButton.textContent = battleState.phase === "ryukyoku" ? "もう一局" : "対局開始";
+    setTextIfChanged(els.battleStatus, battleStatusText());
+    setTextIfChanged(els.battleStartButton, battleState.phase === "ryukyoku" ? "もう一局" : "対局開始");
 
-    els.battleSelfHand.innerHTML = renderSelfHand(selfPlayer, battleState.players.indexOf(selfPlayer), canDiscard);
-    els.battleSelfMelds.innerHTML = renderPlayerMelds(selfPlayer);
-    els.battleLeftMelds.innerHTML = renderPlayerMelds(leftPlayer);
-    els.battleRightMelds.innerHTML = renderPlayerMelds(rightPlayer);
-    els.battleSelfFlowers.innerHTML = (selfPlayer?.flowers || [])
+    setHtmlIfChanged(els.battleSelfHand, renderSelfHand(selfPlayer, battleState.players.indexOf(selfPlayer), canDiscard));
+    setHtmlIfChanged(els.battleSelfMelds, renderPlayerMelds(selfPlayer));
+    setHtmlIfChanged(els.battleLeftMelds, renderPlayerMelds(leftPlayer));
+    setHtmlIfChanged(els.battleRightMelds, renderPlayerMelds(rightPlayer));
+    setHtmlIfChanged(els.battleSelfFlowers, (selfPlayer?.flowers || [])
       .map((tile) => renderBattleTile(tile, "flower-open self-flower-tile tile-no-rotate"))
-      .join("");
-    els.battleLeftFlowers.innerHTML = (leftPlayer?.flowers || [])
+      .join(""));
+    setHtmlIfChanged(els.battleLeftFlowers, (leftPlayer?.flowers || [])
       .map((tile) => renderBattleTile(tile, `flower-open side-flower ${tileRotationClassForSeat(leftPlayer?.seat)}`))
-      .join("");
-    els.battleRightFlowers.innerHTML = (rightPlayer?.flowers || [])
+      .join(""));
+    setHtmlIfChanged(els.battleRightFlowers, (rightPlayer?.flowers || [])
       .map((tile) => renderBattleTile(tile, `flower-open side-flower ${tileRotationClassForSeat(rightPlayer?.seat)}`))
-      .join("");
-    els.battleFlowerTiles.innerHTML = openFlowers.map((tile) => renderBattleTile(tile, "mini")).join("");
-    els.battleSelfRiver.innerHTML = renderDiscardRiver(selfPlayer);
-    els.battleLeftRiver.innerHTML = renderDiscardRiver(leftPlayer);
-    els.battleRightRiver.innerHTML = renderDiscardRiver(rightPlayer);
-    els.battleLeftHand.innerHTML = renderBackTiles(leftPlayer?.hand.length || 0, "side", drawnTileIdForPlayer(battleState.players.indexOf(leftPlayer)));
-    els.battleRightHand.innerHTML = renderBackTiles(rightPlayer?.hand.length || 0, "side", drawnTileIdForPlayer(battleState.players.indexOf(rightPlayer)));
+      .join(""));
+    setHtmlIfChanged(els.battleFlowerTiles, openFlowers.map((tile) => renderBattleTile(tile, "mini")).join(""));
+    setHtmlIfChanged(els.battleSelfRiver, renderDiscardRiver(selfPlayer));
+    setHtmlIfChanged(els.battleLeftRiver, renderDiscardRiver(leftPlayer));
+    setHtmlIfChanged(els.battleRightRiver, renderDiscardRiver(rightPlayer));
+    setHtmlIfChanged(els.battleLeftHand, renderBackTiles(leftPlayer?.hand.length || 0, "side", drawnTileIdForPlayer(battleState.players.indexOf(leftPlayer))));
+    setHtmlIfChanged(els.battleRightHand, renderBackTiles(rightPlayer?.hand.length || 0, "side", drawnTileIdForPlayer(battleState.players.indexOf(rightPlayer))));
     renderBattleScreenPanels();
   }
 
@@ -1761,35 +1778,35 @@
     const leftPlayer = state.players[2];
     const dealer = Rules.dealerOf(state);
     const kyotakuCount = Math.floor((Number(state.kyotaku) || 0) / 1000);
-    els.battleSelfName.textContent = displayPlayerNameByIndex(0);
-    els.battleRightName.textContent = displayPlayerNameByIndex(1);
-    els.battleLeftName.textContent = displayPlayerNameByIndex(2);
-    els.battleRoundLabel.textContent = Rules.roundLabel(state);
+    setTextIfChanged(els.battleSelfName, displayPlayerNameByIndex(0));
+    setTextIfChanged(els.battleRightName, displayPlayerNameByIndex(1));
+    setTextIfChanged(els.battleLeftName, displayPlayerNameByIndex(2));
+    setTextIfChanged(els.battleRoundLabel, Rules.roundLabel(state));
     if (els.battleHonbaKyotakuLabel) {
-      els.battleHonbaKyotakuLabel.textContent = `${state.honba || 0}本場 供託${kyotakuCount} 残--`;
+      setTextIfChanged(els.battleHonbaKyotakuLabel, `${state.honba || 0}本場 供託${kyotakuCount} 残--`);
     }
-    els.battleRemainingDraws.textContent = "残りツモ --";
-    els.battleDealerLabel.textContent = `親 ${displayPlayerNameByIndex(dealer)}`;
-    els.battleKyotakuLabel.textContent = `供託${kyotakuCount}`;
-    els.battleStatus.textContent = "待機中";
-    els.battleStartButton.textContent = "対局開始";
-    els.battleSelfHand.innerHTML = "";
-    els.battleSelfMelds.innerHTML = "";
-    els.battleLeftMelds.innerHTML = "";
-    els.battleRightMelds.innerHTML = "";
-    els.battleSelfFlowers.innerHTML = "";
-    els.battleLeftFlowers.innerHTML = "";
-    els.battleRightFlowers.innerHTML = "";
-    els.battleDoraIndicators.innerHTML = "";
+    setTextIfChanged(els.battleRemainingDraws, "残りツモ --");
+    setTextIfChanged(els.battleDealerLabel, `親 ${displayPlayerNameByIndex(dealer)}`);
+    setTextIfChanged(els.battleKyotakuLabel, `供託${kyotakuCount}`);
+    setTextIfChanged(els.battleStatus, "待機中");
+    setTextIfChanged(els.battleStartButton, "対局開始");
+    setHtmlIfChanged(els.battleSelfHand, "");
+    setHtmlIfChanged(els.battleSelfMelds, "");
+    setHtmlIfChanged(els.battleLeftMelds, "");
+    setHtmlIfChanged(els.battleRightMelds, "");
+    setHtmlIfChanged(els.battleSelfFlowers, "");
+    setHtmlIfChanged(els.battleLeftFlowers, "");
+    setHtmlIfChanged(els.battleRightFlowers, "");
+    setHtmlIfChanged(els.battleDoraIndicators, "");
     renderBattleEffect(null);
-    if (els.battleActionButtons) els.battleActionButtons.innerHTML = "";
-    if (els.battlePlayerScores) els.battlePlayerScores.innerHTML = renderCenterScoreDisplay(state.players, dealer);
-    els.battleFlowerTiles.innerHTML = "";
-    els.battleSelfRiver.innerHTML = "";
-    els.battleLeftRiver.innerHTML = "";
-    els.battleRightRiver.innerHTML = "";
-    els.battleLeftHand.innerHTML = renderBackTiles(13);
-    els.battleRightHand.innerHTML = renderBackTiles(13);
+    if (els.battleActionButtons) setHtmlIfChanged(els.battleActionButtons, "");
+    if (els.battlePlayerScores) setHtmlIfChanged(els.battlePlayerScores, renderCenterScoreDisplay(state.players, dealer));
+    setHtmlIfChanged(els.battleFlowerTiles, "");
+    setHtmlIfChanged(els.battleSelfRiver, "");
+    setHtmlIfChanged(els.battleLeftRiver, "");
+    setHtmlIfChanged(els.battleRightRiver, "");
+    setHtmlIfChanged(els.battleLeftHand, renderBackTiles(13));
+    setHtmlIfChanged(els.battleRightHand, renderBackTiles(13));
     renderBattleScreenPanels();
   }
 
