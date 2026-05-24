@@ -140,7 +140,6 @@ button {
 .battle-surface.is-start-screen .opponent-hand,
 .battle-surface.is-start-screen .self-flower-lane,
 .battle-surface.is-start-screen .battle-effect,
-.battle-surface.is-start-screen .auto-control-row,
 .battle-surface.is-start-screen .self-name,
 .battle-surface.is-start-screen .self-hand-line,
 .battle-surface.is-start-screen .battle-action-buttons {
@@ -1955,19 +1954,6 @@ input[type="checkbox"] {
   grid-template-rows: auto auto;
 }
 
-.auto-control-row {
-  box-sizing: border-box;
-  grid-column: 1;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 30px;
-  width: 100%;
-  padding-left: 10px;
-  min-height: 34px;
-}
-
 .battle-control-row {
   grid-column: 1;
   grid-row: 1;
@@ -1990,26 +1976,6 @@ input[type="checkbox"] {
 .battle-action-button {
   min-height: 34px;
   padding: 0 14px;
-}
-
-.toggle-action-button {
-  min-height: 34px;
-  padding: 0 14px;
-  font-size: inherit;
-}
-
-.toggle-action-button.is-on {
-  opacity: 1;
-  filter: none;
-}
-
-.toggle-action-button.is-off {
-  opacity: 0.72;
-  filter: saturate(0.78) brightness(0.86);
-}
-
-#kanSkipButton {
-  display: none !important;
 }
 
 .self-hand-area .battle-start-button {
@@ -2058,19 +2024,13 @@ body {
 
 .self-hand-line,
 .self-hand,
-.battle-control-row,
-.auto-control-row {
+.battle-control-row {
   min-width: 0;
 }
 
 .battle-control-row {
   align-items: flex-start;
   min-height: 36px;
-}
-
-.auto-control-row {
-  min-height: 36px;
-  gap: clamp(16px, 3vw, 25px);
 }
 
 .battle-action-buttons {
@@ -2082,7 +2042,6 @@ body {
 }
 
 .battle-action-button,
-.toggle-action-button,
 .self-hand-area .battle-start-button {
   min-width: 44px;
   min-height: 36px;
@@ -2188,8 +2147,7 @@ body {
     padding: 4px 6px;
   }
 
-  .battle-control-row,
-  .auto-control-row {
+  .battle-control-row {
     min-height: 36px;
   }
 
