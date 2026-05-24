@@ -676,9 +676,14 @@
     const indexedName = displayPlayerNameByIndex(playerIndex);
     if (indexedName) return indexedName;
     const text = String(value ?? "").trim();
-    if (text === "Player 1" || text === "player1" || text === "0") return "自分";
-    if (text === "Player 2" || text === "player2" || text === "1" || text === "CPU Shimocha") return "下家";
-    if (text === "Player 3" || text === "player3" || text === "2" || text === "CPU Kamicha") return "上家";
+    const legacyNumber = text.match(/^Player\s*([123])$/i)?.[1];
+    if (legacyNumber) return displayPlayerNameByIndex(Number(legacyNumber) - 1);
+    const legacyCpuSeat = text.match(/^CPU\s+(Shimocha|Kamicha)$/i)?.[1]?.toLowerCase();
+    if (legacyCpuSeat === "shimocha") return "下家";
+    if (legacyCpuSeat === "kamicha") return "上家";
+    if (text === "player1" || text === "0") return "自分";
+    if (text === "player2" || text === "1") return "下家";
+    if (text === "player3" || text === "2") return "上家";
     return text;
   }
 
