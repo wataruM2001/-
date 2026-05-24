@@ -331,7 +331,7 @@
           kyotaku: Number.isFinite(Number(saved.kyotaku)) ? Number(saved.kyotaku) : 0,
           riichi: Array.isArray(saved.riichi) ? saved.riichi.map(Boolean).slice(0, 3) : [false, false, false],
           players: saved.players.map((player, index) => ({
-            name: player.name || `Player ${index + 1}`,
+            name: displayPlayerNameForValue(player.name, index),
             score: Number(player.score) || 0,
             bonus: Number(player.bonus) || 0,
             tobi: Number(player.tobi) || 0,
@@ -380,12 +380,12 @@
   function renderPlayers() {
     state.players.forEach((player, index) => {
       document.querySelector(`[data-player-card="${index}"] .seat-chip`).textContent = Rules.seatForPlayer(state, index);
-      document.getElementById(`playerName${index}`).value = player.name;
+      document.getElementById(`playerName${index}`).value = displayPlayerNameByIndex(index);
       document.getElementById(`playerScore${index}`).value = player.score;
       document.getElementById(`bonus${index}`).textContent = formatSigned(player.bonus);
       document.getElementById(`tobi${index}`).textContent = formatSigned(player.tobi);
       document.querySelector(`[data-player-card="${index}"]`).classList.toggle("is-dealer", index === Rules.dealerOf(state));
-      document.getElementById(`tenpaiLabel${index}`).textContent = `${Rules.seatForPlayer(state, index)} ${player.name} 聴牌`;
+      document.getElementById(`tenpaiLabel${index}`).textContent = `${displayPlayerNameByIndex(index)} 聴牌`;
       const riichiButton = document.querySelector(`[data-riichi-button="${index}"]`);
       const isRiichi = Boolean(state.riichi?.[index]);
       riichiButton.textContent = isRiichi ? "取消" : "成立";
@@ -408,9 +408,9 @@
     const initialDealerIndex = randomBattleDealerIndex();
     battleState = Game.startNewHand({
       playerNames: [
-        state.players[0]?.name || "Player 1",
-        state.players[1]?.name || "CPU 下家",
-        state.players[2]?.name || "CPU 上家",
+        displayPlayerNameByIndex(0),
+        displayPlayerNameByIndex(1),
+        displayPlayerNameByIndex(2),
       ],
       dealerIndex: initialDealerIndex,
       initialDealerIndex,
@@ -453,9 +453,9 @@
 
   function battlePlayerNames() {
     return [
-      state.players[0]?.name || "Player 1",
-      state.players[1]?.name || "CPU 下家",
-      state.players[2]?.name || "CPU 上家",
+      displayPlayerNameByIndex(0),
+      displayPlayerNameByIndex(1),
+      displayPlayerNameByIndex(2),
     ];
   }
 
@@ -667,8 +667,23 @@
     };
   }
 
+  function displayPlayerNameByIndex(playerIndex) {
+    if (playerIndex === null || playerIndex === undefined || playerIndex === "") return "";
+    return ["自分", "下家", "上家"][Number(playerIndex)] || "";
+  }
+
+  function displayPlayerNameForValue(value, playerIndex = null) {
+    const indexedName = displayPlayerNameByIndex(playerIndex);
+    if (indexedName) return indexedName;
+    const text = String(value ?? "").trim();
+    if (text === "Player 1" || text === "player1" || text === "0") return "自分";
+    if (text === "Player 2" || text === "player2" || text === "1" || text === "CPU Shimocha") return "下家";
+    if (text === "Player 3" || text === "player3" || text === "2" || text === "CPU Kamicha") return "上家";
+    return text;
+  }
+
   function battlePlayerName(gameState, playerIndex) {
-    return gameState.players[playerIndex]?.name || `Player ${playerIndex + 1}`;
+    return displayPlayerNameByIndex(playerIndex) || displayPlayerNameForValue(gameState.players[playerIndex]?.name);
   }
 
   function randomBattleDealerIndex() {
@@ -1027,7 +1042,7 @@
     if (seat === "self") return "自分";
     if (seat === "shimocha") return "下家";
     if (seat === "kamicha") return "上家";
-    return "Player";
+    return "";
   }
 
   function currentSeatWind(playerIndex, dealerIndex) {
@@ -1169,8 +1184,7 @@
     const seats = ["self", "shimocha", "kamicha"];
     return seats
       .map((seat, index) => {
-        const player = battleState?.players[index];
-        return `<li>${escapeHtml(playerPositionLabel(seat))} ${escapeHtml(player?.name || `Player ${index + 1}`)} ${escapeHtml(formatBattleDelta(record[seat], suffix))}</li>`;
+        return `<li>${escapeHtml(playerPositionLabel(seat))} ${escapeHtml(formatBattleDelta(record[seat], suffix))}</li>`;
       })
       .join("");
   }
@@ -1328,7 +1342,7 @@
             : "";
           return `
           <article class="battle-settlement-card">
-            <strong>${item.rank}位：${escapeHtml(item.name)}</strong>
+            <strong>${item.rank}位：${escapeHtml(displayPlayerNameForValue(item.name, item.index))}</strong>
             <span>最終持ち点：${Number(item.points).toLocaleString("ja-JP")}</span>
             ${detailRows}
             <b>最終ポイント：${formatBattleDelta(item.displayFinalPoint)}</b>
@@ -1703,9 +1717,9 @@
       (!battleState.riichiDeclaration ||
         battleState.riichiDeclaration.playerIndex === battleState.currentPlayerIndex);
 
-    els.battleSelfName.textContent = `自分 ${selfPlayer?.name || "Player 1"}`;
-    els.battleRightName.textContent = `下家 ${rightPlayer?.name || "CPU 下家"}`;
-    els.battleLeftName.textContent = `上家 ${leftPlayer?.name || "CPU 上家"}`;
+    els.battleSelfName.textContent = displayPlayerNameByIndex(0);
+    els.battleRightName.textContent = displayPlayerNameByIndex(1);
+    els.battleLeftName.textContent = displayPlayerNameByIndex(2);
     renderCentralInfoPanel(battleState);
     renderBattleEffect(battleState);
     if (els.battleActionButtons) {
@@ -1742,15 +1756,15 @@
     const leftPlayer = state.players[2];
     const dealer = Rules.dealerOf(state);
     const kyotakuCount = Math.floor((Number(state.kyotaku) || 0) / 1000);
-    els.battleSelfName.textContent = `自分 ${ownPlayer?.name || "Player 1"}`;
-    els.battleRightName.textContent = `下家 ${rightPlayer?.name || "Player 2"}`;
-    els.battleLeftName.textContent = `上家 ${leftPlayer?.name || "Player 3"}`;
+    els.battleSelfName.textContent = displayPlayerNameByIndex(0);
+    els.battleRightName.textContent = displayPlayerNameByIndex(1);
+    els.battleLeftName.textContent = displayPlayerNameByIndex(2);
     els.battleRoundLabel.textContent = Rules.roundLabel(state);
     if (els.battleHonbaKyotakuLabel) {
       els.battleHonbaKyotakuLabel.textContent = `${state.honba || 0}本場 供託${kyotakuCount} 残--`;
     }
     els.battleRemainingDraws.textContent = "残りツモ --";
-    els.battleDealerLabel.textContent = `親 ${state.players[dealer]?.name || `Player ${dealer + 1}`}`;
+    els.battleDealerLabel.textContent = `親 ${displayPlayerNameByIndex(dealer)}`;
     els.battleKyotakuLabel.textContent = `供託${kyotakuCount}`;
     els.battleStatus.textContent = "待機中";
     els.battleStartButton.textContent = "対局開始";
@@ -1796,8 +1810,7 @@
     state.seatOrder = Rules.normalizeSeatOrder(state.seatOrder, state.dealer);
     const optionHtml = state.seatOrder
       .map((playerIndex) => {
-        const player = state.players[playerIndex];
-        return `<option value="${playerIndex}">${escapeHtml(Rules.seatForPlayer(state, playerIndex))} ${escapeHtml(player.name)}</option>`;
+        return `<option value="${playerIndex}">${escapeHtml(displayPlayerNameByIndex(playerIndex))}</option>`;
       })
       .join("");
     [els.dealerSelect, els.winnerSelect, els.secondWinnerSelect, els.discarderSelect, els.finishWinnerSelect].forEach((select) => {
@@ -1818,7 +1831,7 @@
 
   function syncPlayersFromInputs() {
     state.players.forEach((player, index) => {
-      player.name = document.getElementById(`playerName${index}`).value.trim() || `Player ${index + 1}`;
+      player.name = displayPlayerNameByIndex(index);
       player.score = Number(document.getElementById(`playerScore${index}`).value) || 0;
     });
   }
@@ -1843,7 +1856,7 @@
   }
 
   function playerLabel(playerIndex) {
-    return `${Rules.seatForPlayer(state, playerIndex)} ${state.players[playerIndex]?.name || `Player ${playerIndex + 1}`}`;
+    return displayPlayerNameByIndex(playerIndex);
   }
 
   function updateDoubleRonLabels() {
@@ -1955,14 +1968,14 @@
         const dealer = Rules.dealerOf(state);
         const south = Rules.playerAtSeat(state, 1);
         const drawPayment = Rules.calculateDrawPayment(hand);
-        const parentText = `${state.players[dealer].name} 親${drawPayment.tenpai[dealer] ? "聴牌" : "ノーテン"}`;
+        const parentText = `${displayPlayerNameByIndex(dealer)} 親${drawPayment.tenpai[dealer] ? "聴牌" : "ノーテン"}`;
         const nextText = drawPayment.tenpai[dealer]
           ? oorasuPreviewText(hand, true)
           : Rules.isOorasu(state)
             ? "南3局終了"
-            : `${state.players[south].name} が次の東家`;
+            : `${displayPlayerNameByIndex(south)} が次の東家`;
         const paymentText = drawPayment.payerDetails.length
-          ? drawPayment.payerDetails.map((item) => `${state.players[item.player].name}→${state.players[item.winner].name} ${item.amount.toLocaleString("ja-JP")}`).join(" / ")
+          ? drawPayment.payerDetails.map((item) => `${displayPlayerNameByIndex(item.player)}→${displayPlayerNameByIndex(item.winner)} ${item.amount.toLocaleString("ja-JP")}`).join(" / ")
           : "点棒移動なし";
         els.paymentPreview.textContent = `${paymentText} / ${parentText} / ${nextText} / 本場 +1 / 供託 ${(Number(state.kyotaku) || 0).toLocaleString("ja-JP")}点持ち越し`;
         return;
@@ -1976,23 +1989,23 @@
       const bonus = bonusSettlement.amount;
       const payerText = payment.payerDetails
         .map((item) => {
-          const winnerText = item.winner !== undefined ? `→${state.players[item.winner].name}` : "";
-          return `${state.players[item.player].name}${winnerText} ${item.amount.toLocaleString("ja-JP")}`;
+          const winnerText = item.winner !== undefined ? `→${displayPlayerNameByIndex(item.winner)}` : "";
+          return `${displayPlayerNameByIndex(item.player)}${winnerText} ${item.amount.toLocaleString("ja-JP")}`;
         })
         .join(" / ");
       const kyotakuWinner = Rules.kyotakuWinnerFor(hand, state);
       const kyotakuText =
         (Number(state.kyotaku) || 0) > 0 && kyotakuWinner !== null
-          ? ` / 供託 ${(Number(state.kyotaku) || 0).toLocaleString("ja-JP")}点→${state.players[kyotakuWinner].name}`
+          ? ` / 供託 ${(Number(state.kyotaku) || 0).toLocaleString("ja-JP")}点→${displayPlayerNameByIndex(kyotakuWinner)}`
           : "";
       const nextText =
         Rules.isParentContinuationWin(hand, state)
           ? oorasuPreviewText(hand, true)
           : Rules.isOorasu(state)
             ? "南3局終了"
-            : `${state.players[Rules.playerAtSeat(state, 1)].name} が次の東家・本場 0`;
+            : `${displayPlayerNameByIndex(Rules.playerAtSeat(state, 1))} が次の東家・本場 0`;
       const bonusText = bonusSettlement.details.length
-        ? bonusSettlement.details.map((item) => `${state.players[item.payer].name}→${state.players[item.winner].name} ${item.amount.toLocaleString("ja-JP")}pt`).join(" / ")
+        ? bonusSettlement.details.map((item) => `${displayPlayerNameByIndex(item.payer)}→${displayPlayerNameByIndex(item.winner)} ${item.amount.toLocaleString("ja-JP")}pt`).join(" / ")
         : "祝儀 0";
       els.paymentPreview.textContent = `${payerText}${kyotakuText} / ${bonusText} / ${nextText}`;
     } catch (error) {
@@ -2089,7 +2102,7 @@
           <article class="settlement-card">
             <div>
               <span>${item.rank}位 / ${item.score.toLocaleString("ja-JP")}点</span>
-              <strong class="rank-name">${escapeHtml(item.name)}</strong>
+              <strong class="rank-name">${escapeHtml(displayPlayerNameForValue(item.name, item.index))}</strong>
               <span>順位 ${formatSigned(item.rankPoint)} / 祝儀 ${formatSigned(item.bonus)} / トビ賞 ${formatSigned(item.tobi)} / 供託回収 ${formatSigned(item.kyotakuRecovery)}</span>
             </div>
             <strong class="${item.total >= 0 ? "positive" : "negative"}">${formatSigned(item.total)}</strong>
@@ -2110,12 +2123,12 @@
       .reverse()
       .map((hand, reverseIndex) => {
         const number = state.history.length - reverseIndex;
-        const scoreText = hand.scores.map((score, index) => `${state.players[index].name}: ${score.toLocaleString("ja-JP")}`).join(" / ");
+        const scoreText = hand.scores.map((score, index) => `${displayPlayerNameByIndex(index)}: ${score.toLocaleString("ja-JP")}`).join(" / ");
         if (hand.winType === "draw") {
-          const dealerName = state.players[hand.dealer]?.name || `Player ${hand.dealer + 1}`;
+          const dealerName = displayPlayerNameByIndex(hand.dealer);
           const nextText = hand.dealerTenpai ? "親継続" : "南家へ親移動";
           const paymentText = hand.payment?.payerDetails?.length
-            ? hand.payment.payerDetails.map((item) => `${state.players[item.player].name}→${state.players[item.winner].name} ${item.amount.toLocaleString("ja-JP")}点`).join(" / ")
+            ? hand.payment.payerDetails.map((item) => `${displayPlayerNameByIndex(item.player)}→${displayPlayerNameByIndex(item.winner)} ${item.amount.toLocaleString("ja-JP")}点`).join(" / ")
             : "点棒移動なし";
           return `
           <li>
@@ -2125,10 +2138,10 @@
         `;
         }
         const winnerSeat = hand.seats?.[hand.winner] || Rules.seatForPlayer(hand.dealer, hand.winner);
-        const winnerName = state.players[hand.winner]?.name || `Player ${hand.winner + 1}`;
+        const winnerName = displayPlayerNameByIndex(hand.winner);
         const secondWinnerText =
           hand.winType === "doubleRon"
-            ? `・${hand.seats?.[hand.secondWinner] || Rules.seatForPlayer(hand.dealer, hand.secondWinner)} ${state.players[hand.secondWinner]?.name || `Player ${hand.secondWinner + 1}`}`
+            ? `・${displayPlayerNameByIndex(hand.secondWinner)}`
             : "";
         const winLabel = hand.winType === "tsumo" ? "ツモ" : hand.winType === "doubleRon" ? "ダブロン" : "ロン";
         const hanText =
@@ -2136,7 +2149,7 @@
             ? Rules.winnersOf(hand)
                 .map((winnerIndex) => {
                   const seat = hand.seats?.[winnerIndex] || Rules.seatForPlayer(hand.dealer, winnerIndex);
-                  const name = state.players[winnerIndex]?.name || `Player ${winnerIndex + 1}`;
+                  const name = displayPlayerNameByIndex(winnerIndex);
                   const han = hand.doubleRonHands?.[winnerIndex]?.han ?? hand.doubleRonHands?.[String(winnerIndex)]?.han ?? hand.han;
                   return `${seat} ${name} ${han}ハン`;
                 })
@@ -2144,11 +2157,11 @@
             : `${hand.han}ハン`;
         const kyotakuText =
           Number(hand.kyotakuBefore) > 0 && hand.kyotakuWinner !== null
-            ? ` / 供託 ${Number(hand.kyotakuBefore).toLocaleString("ja-JP")}点→${state.players[hand.kyotakuWinner].name}`
+            ? ` / 供託 ${Number(hand.kyotakuBefore).toLocaleString("ja-JP")}点→${displayPlayerNameByIndex(hand.kyotakuWinner)}`
             : "";
         const bonusText =
           hand.bonusSettlement?.details?.length
-            ? ` / 祝儀 ${hand.bonusSettlement.details.map((item) => `${state.players[item.payer].name}→${state.players[item.winner].name} ${item.amount.toLocaleString("ja-JP")}pt`).join(" / ")}`
+            ? ` / 祝儀 ${hand.bonusSettlement.details.map((item) => `${displayPlayerNameByIndex(item.payer)}→${displayPlayerNameByIndex(item.winner)} ${item.amount.toLocaleString("ja-JP")}pt`).join(" / ")}`
             : "";
         return `
           <li>
@@ -2234,7 +2247,7 @@
 
   function formatSeatCounts(counts) {
     return counts
-      .map((count, index) => `${state.players[index].name} ${count.東}/${count.南}/${count.西}`)
+      .map((count, index) => `${displayPlayerNameByIndex(index)} ${count.東}/${count.南}/${count.西}`)
       .join(" / ");
   }
 
