@@ -2124,6 +2124,10 @@ body {
     --hand-tile-width: calc(var(--tablet-hand-tile-base) * var(--tablet-ui-scale));
     --draw-tile-gap: calc(var(--hand-tile-width) * var(--draw-tile-gap-ratio));
   }
+
+  .center-score-display .score-display {
+    font-size: 25px;
+  }
 }
 
 @media (max-width: 680px) {
