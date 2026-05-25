@@ -5,7 +5,8 @@
   const Tiles = window.MahjongTiles;
   const Game = window.MahjongGame;
   const STORAGE_KEY = "marchao-sanma-score-table-v1";
-  const RESULT_TRANSITION_DELAY_MS = 1000;
+  const BATTLE_EFFECT_DURATION_MS = 1000;
+  const RESULT_TRANSITION_DELAY_MS = BATTLE_EFFECT_DURATION_MS;
   const CPU_DISCARD_DELAY_MS = 1500;
   const RESULT_YAKU_NAME_MAP = {
     riichi: "立直",
@@ -1654,7 +1655,7 @@
       activeBattleEffect = null;
       renderActiveBattleEffect();
       playNextBattleEffect();
-    }, 500);
+    }, BATTLE_EFFECT_DURATION_MS);
   }
 
   function queueBattleEffects(gameState) {
