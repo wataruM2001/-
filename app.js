@@ -5,8 +5,9 @@
   const Tiles = window.MahjongTiles;
   const Game = window.MahjongGame;
   const STORAGE_KEY = "marchao-sanma-score-table-v1";
-  const BATTLE_EFFECT_DURATION_MS = 1000;
-  const RESULT_TRANSITION_DELAY_MS = BATTLE_EFFECT_DURATION_MS;
+  const BATTLE_EFFECT_DURATION_MS = 1200;
+  const YAKUMAN_EFFECT_DURATION_MS = 1500;
+  const RESULT_TRANSITION_DELAY_MS = YAKUMAN_EFFECT_DURATION_MS;
   const CPU_DISCARD_DELAY_MS = 1500;
   const RESULT_YAKU_NAME_MAP = {
     riichi: "立直",
@@ -1585,6 +1586,21 @@
     return Number.isInteger(gameState?.currentPlayerIndex) ? gameState.currentPlayerIndex : 0;
   }
 
+  function battleEffectClassForAction(action, effectText = "") {
+    const text = String(effectText || "");
+    if (action?.nagashiYakuman || hasExplicitYakuman(action?.evaluation) || text.includes("役満")) return "effect-yakuman";
+    if (action?.type === "win") return action.winType === "tsumo" ? "effect-tsumo" : "effect-ron";
+    if (action?.type === "riichi" || action?.type === "riichiDeclaration") return "effect-riichi";
+    if (action?.type === "pon") return "effect-pon";
+    if (action?.type === "kan" || action?.afterKan) return "effect-kan";
+    if (action?.type === "ryukyoku") return "effect-ryukyoku";
+    return "effect-standard";
+  }
+
+  function battleEffectDurationMsForClasses(classes = "") {
+    return String(classes).includes("effect-yakuman") ? YAKUMAN_EFFECT_DURATION_MS : BATTLE_EFFECT_DURATION_MS;
+  }
+
   function battleEffectItemsForAction(gameState) {
     const action = gameState?.lastAction;
     if (!action) return [];
@@ -1602,9 +1618,9 @@
         classes: `marchao ${flowerEffectTone(action.tileId)}`,
       });
     }
-    const effectText = action.effect || (action.afterKan ? gameState.lastEffect : "");
+    const effectText = action.effect || (action.afterKan ? gameState.lastEffect : "") || (action.type === "ryukyoku" ? "流局" : "");
     const actionEffect = effectText
-      ? [{ text: effectText, playerIndex, classes: "standard" }]
+      ? [{ text: effectText, playerIndex, classes: battleEffectClassForAction(action, effectText) }]
       : [];
     return [...flowerItems, ...actionEffect];
   }
@@ -1642,7 +1658,7 @@
     }
     positionBattleEffect(battleState, activeBattleEffect.playerIndex);
     els.battleEffect.textContent = activeBattleEffect.text;
-    els.battleEffect.className = `battle-effect ${activeBattleEffect.classes || ""}`.trim();
+    els.battleEffect.className = `battle-effect is-active ${activeBattleEffect.classes || ""}`.trim();
     els.battleEffect.hidden = false;
   }
 
@@ -1655,7 +1671,7 @@
       activeBattleEffect = null;
       renderActiveBattleEffect();
       playNextBattleEffect();
-    }, BATTLE_EFFECT_DURATION_MS);
+    }, battleEffectDurationMsForClasses(activeBattleEffect.classes));
   }
 
   function queueBattleEffects(gameState) {
