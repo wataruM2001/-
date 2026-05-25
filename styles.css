@@ -3306,3 +3306,280 @@ button:disabled:hover,
     brightness(0.86)
     drop-shadow(0 4px 4px rgba(0, 0, 0, 0.24));
 }
+
+@media (max-width: 950px) and (max-height: 520px) and (orientation: landscape) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .app-shell {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .battle-surface {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) {
+    --center-layout-gap: 1px;
+    --center-river-tile-width: clamp(18px, 4.7vh, 24px);
+    --center-river-tile-long: calc(var(--center-river-tile-width) * 1.40625);
+    --side-river-width: calc(4 * var(--center-river-tile-long));
+    --center-panel-width: calc(6 * var(--center-river-tile-width));
+    --center-panel-height: calc(6 * var(--center-river-tile-width));
+    --self-river-height: calc(3 * var(--center-river-tile-long));
+    --center-layout-scale: 1;
+    --center-layout-top: clamp(90px, 34vh, 132px);
+    --center-layout-upshift: calc(var(--center-river-tile-long) * 1.2);
+    --center-layout-downshift: -8px;
+    --hand-tile-width: clamp(20px, 5vh, 34px);
+    --draw-tile-gap-ratio: 0.24;
+    --draw-tile-gap: calc(var(--hand-tile-width) * var(--draw-tile-gap-ratio));
+    --battle-action-gap: clamp(6px, calc(var(--hand-tile-width) * 0.55), 18px);
+    --open-tile-width: calc((var(--hand-tile-width) + var(--center-river-tile-width)) / 2);
+    --open-tile-height: calc(var(--open-tile-width) * 1.40625);
+    --meld-group-gap: 5px;
+    --meld-tile-gap: 1px;
+    --battle-effect-font-size: clamp(42px, 11vh, 58px);
+    --battle-effect-marchao-font-size: clamp(34px, 9vh, 46px);
+    --self-flower-left-shift: calc(var(--hand-tile-width) * 2.4);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .center-table-layout {
+    max-width: 94vw;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .center-table-layout .center-tableau {
+    gap: 2px;
+    padding: 5px;
+    border-radius: 8px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .dora-indicator-row {
+    transform: translateY(1px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .round-title-block {
+    top: calc(50% - 5px);
+    width: calc(var(--center-river-tile-width) * 3.2);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) #battleRoundLabel {
+    font-size: clamp(15px, 4.3vh, 20px);
+    line-height: 0.92;
+    white-space: nowrap;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) #battleHonbaKyotakuLabel {
+    margin-top: 2px;
+    font-size: clamp(8px, 2.2vh, 10px);
+    white-space: nowrap;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .center-score-display .score-display {
+    font-size: clamp(12px, 3.5vh, 16px);
+    white-space: nowrap;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .kamicha-score {
+    left: 9px;
+    top: calc(50% - var(--center-river-tile-long) + 4px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .shimocha-score {
+    right: 9px;
+    top: calc(50% - var(--center-river-tile-long) + 4px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-score {
+    bottom: 4px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-hand {
+    top: 2%;
+    bottom: 8%;
+    gap: 2px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left {
+    left: 2px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right {
+    right: 2px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .side-hand {
+    --side-tile-width: var(--center-river-tile-width);
+    --side-tile-long: var(--center-river-tile-long);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .side-flower-lane,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .side-meld-lane {
+    padding: 2px;
+    gap: 1px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left .side-flower-lane,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left .side-meld-lane {
+    left: calc(100% + 2px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-flower-lane,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-meld-lane {
+    right: calc(100% + 2px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-hand-area {
+    bottom: 2px;
+    width: min(86vw, 680px);
+    max-width: calc(100vw - 18px);
+    gap: 3px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-control-row {
+    min-height: 26px;
+    align-items: center;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-action-buttons {
+    min-height: 26px;
+    gap: var(--battle-action-gap);
+    row-gap: 3px;
+    transform: none;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) button,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-action-button,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-result-button,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .paifu-nav-button {
+    writing-mode: horizontal-tb;
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-action-button,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-hand-area .battle-start-button,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-result-button {
+    min-width: 34px;
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: clamp(10px, 2.8vh, 12px);
+    line-height: 1;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-hand-line {
+    gap: 4px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-hand {
+    min-height: 0;
+    padding: 2px 3px;
+    gap: 0;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-flower-lane {
+    right: calc(clamp(10px, 3vw, 24px) + var(--self-flower-left-shift));
+    bottom: calc(var(--hand-tile-width) * 1.40625 + 33px);
+    padding: 2px;
+    gap: 1px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .river-left,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .river-right,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .river-self {
+    gap: 0;
+    padding: 0;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-effect,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .action-effect {
+    max-width: calc(100vw - 24px);
+    -webkit-text-stroke-width: 2px;
+    letter-spacing: 0.02em;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-effect.effect-riichi {
+    font-size: clamp(34px, 9vh, 48px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-effect.effect-yakuman {
+    font-size: clamp(44px, 12vh, 64px);
+    -webkit-text-stroke-width: 3px;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .battle-effect::before,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .action-effect::before {
+    width: clamp(118px, 34vh, 170px);
+    height: clamp(118px, 34vh, 170px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .paifu-panel {
+    --paifu-control-bottom: calc(var(--hand-tile-width) * 1.40625 + 31px);
+    max-width: calc(100vw - 10px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .paifu-controls {
+    min-height: 27px;
+    gap: 3px;
+    padding: 2px 5px;
+    border-radius: 999px;
+    flex-wrap: nowrap;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .paifu-controls .paifu-nav-button {
+    width: auto;
+    min-width: max-content;
+    min-height: 23px;
+    height: 23px;
+    padding: 0 6px;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .battle-result-panel:not(.result-transparent),
+  .battle-settlement-panel {
+    width: min(92vw, 560px);
+    max-height: calc(100dvh - 12px);
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .battle-result-panel:not(.result-transparent) {
+    top: 6px !important;
+    height: calc(100dvh - 12px) !important;
+  }
+
+  .battle-result-body {
+    gap: 8px;
+  }
+
+  .result-win-detail,
+  .result-player-row,
+  .battle-settlement-card {
+    padding: 7px;
+  }
+
+  .result-player-row,
+  .battle-settlement-card span,
+  .battle-result-body,
+  .battle-settlement-body {
+    font-size: clamp(10px, 2.7vh, 12px);
+    line-height: 1.25;
+  }
+
+  .result-tile-img,
+  .result-dora-row .result-tile-img,
+  .result-ryukyoku-tile-row .table-tile-img,
+  .result-meld-row .table-tile-img {
+    width: clamp(17px, 4.3vh, 22px);
+  }
+}
