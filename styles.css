@@ -503,11 +503,13 @@ button {
 
 .battle-effect,
 .action-effect {
-  position: absolute;
+  position: fixed;
   left: 50%;
   top: 50%;
-  z-index: 8;
+  z-index: 9999;
   transform: translate(-50%, -50%);
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
   color: #fff2b0;
   font-size: var(--battle-effect-font-size);
   font-weight: 1000;
@@ -718,6 +720,7 @@ button {
   .battle-effect,
   .action-effect {
     font-size: clamp(52px, 15vw, 88px);
+    max-width: calc(100vw - 24px);
     -webkit-text-stroke-width: 2px;
     letter-spacing: 0.03em;
   }
