@@ -1478,8 +1478,16 @@
     discarder.calledDiscardCount = (Number(discarder.calledDiscardCount) || 0) + 1;
   }
 
+  function commitRiichiBeforeCallIfNeeded(gameState) {
+    const pending = gameState?.pendingRiichi;
+    if (!pending || pending.playerIndex !== gameState?.lastAction?.playerIndex) {
+      return cloneGameState(gameState);
+    }
+    return commitRiichiIfPending(gameState);
+  }
+
   function callPon(gameState, playerIndex, discardTile = gameState.pendingAction?.discardTile) {
-    const next = cloneGameState(gameState);
+    const next = commitRiichiBeforeCallIfNeeded(gameState);
     const player = next.players[playerIndex];
     const discarder = next.players[next.lastAction?.playerIndex];
     if (!canPon(player, discardTile)) throw new Error("Pon is not available.");
@@ -1544,7 +1552,7 @@
   }
 
   function callKan(gameState, playerIndex, candidate = null) {
-    let next = cloneGameState(gameState);
+    let next = commitRiichiBeforeCallIfNeeded(gameState);
     const player = next.players[playerIndex];
     const candidates = candidate ? [candidate] : getKanCandidates(player, next);
     const kan = candidates[0];
@@ -1951,6 +1959,9 @@
       .find(({ actions }) => hasAnyAction(actions));
 
     if (humanReaction) {
+      if (!humanReaction.actions?.canRon) {
+        next = commitRiichiIfPending(next);
+      }
       return setPendingAction(next, {
         playerId: humanReaction.player.id,
         playerIndex: humanReaction.playerIndex,
