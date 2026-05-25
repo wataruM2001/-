@@ -1399,11 +1399,14 @@
     if (win.isNagashiYakuman) return "";
     const doraIndicators = win.doraIndicators || result.doraIndicators || [];
     const uraDoraIndicators = win.uraDoraIndicators || result.uraDoraIndicators || [];
+    const hasRiichiWinner = Boolean(result.wins?.some((entry) => entry.isRiichi) || win.isRiichi);
     return `
-      <div class="result-dora-row" aria-label="ドラ表示牌と裏ドラ表示牌">
+      <div class="result-dora-row" aria-label="表ドラと裏ドラ">
+        <span class="result-dora-label">表ドラ：</span>
         <div class="result-dora-group">${renderFiveResultIndicatorSlots(doraIndicators, true)}</div>
         <div class="result-dora-spacer" aria-hidden="true"></div>
-        <div class="result-dora-group">${renderFiveResultIndicatorSlots(uraDoraIndicators, Boolean(win.isRiichi))}</div>
+        <span class="result-dora-label">裏ドラ：</span>
+        <div class="result-dora-group">${renderFiveResultIndicatorSlots(uraDoraIndicators, hasRiichiWinner)}</div>
       </div>
     `;
   }
@@ -1502,8 +1505,6 @@
               <article class="result-win-detail">
                 ${wins.length > 1 ? `<strong>${escapeHtml(win.title)}</strong>` : ""}
                 ${renderResultDoraIndicatorRow(win, result)}
-                ${win.isNagashiYakuman ? "" : renderResultTileRow("ドラ表示牌", win.doraIndicators || result.doraIndicators || [])}
-                ${win.isRiichi ? renderResultTileRow("裏ドラ表示牌", win.uraDoraIndicators || result.uraDoraIndicators || []) : ""}
                 <div class="result-detail-text">${escapeHtml(win.yakuText)}</div>
                 <div class="result-detail-text">${escapeHtml(win.pointText)}</div>
                 ${renderResultHandTiles(win)}
