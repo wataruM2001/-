@@ -1704,6 +1704,7 @@
     const text = String(effectText || "");
     if (action?.nagashiYakuman || hasExplicitYakuman(action?.evaluation) || text.includes("役満")) return "effect-yakuman";
     if (action?.type === "win") return action.winType === "tsumo" ? "effect-tsumo" : "effect-ron";
+    if (text === "リーチ") return "effect-riichi";
     if (action?.type === "riichi" || action?.type === "riichiDeclaration") return "effect-riichi";
     if (action?.type === "pon") return "effect-pon";
     if (action?.type === "kan" || action?.afterKan) return "effect-kan";
@@ -1812,6 +1813,7 @@
   function fitSideBattleEffect(effectEl, seat, panelRect, viewportWidth) {
     effectEl.style.removeProperty("font-size");
     let size = battleEffectMeasuredSize(effectEl);
+    if (effectEl.classList.contains("effect-riichi")) return size;
     if (seat !== "shimocha" && seat !== "kamicha") return size;
 
     const sideWidth = seat === "shimocha"
@@ -1820,12 +1822,27 @@
     if (sideWidth <= 0 || size.width <= sideWidth) return size;
 
     const currentFontSize = parseFloat(window.getComputedStyle(effectEl).fontSize) || 64;
-    const nextFontSize = Math.max(44, currentFontSize * Math.min(1, sideWidth / size.width));
+    const nextFontSize = Math.max(28, currentFontSize * Math.min(1, sideWidth / size.width));
     if (nextFontSize < currentFontSize) {
       effectEl.style.fontSize = `${nextFontSize}px`;
       size = battleEffectMeasuredSize(effectEl);
     }
     return size;
+  }
+
+  function positionSideBattleEffect(effectEl, seat, panelRect, bounds, viewportWidth, viewportHeight) {
+    const size = fitSideBattleEffect(effectEl, seat, panelRect, viewportWidth);
+    const panelCenterY = panelRect.top + panelRect.height / 2;
+    const point = {
+      x:
+        seat === "shimocha"
+          ? panelRect.right + size.width / 2 + EFFECT_PANEL_MARGIN
+          : panelRect.left - size.width / 2 - EFFECT_PANEL_MARGIN,
+      y: panelCenterY,
+    };
+    const clamped = clampEffectPoint(point, size, bounds, EFFECT_SCREEN_MARGIN);
+    effectEl.style.left = `${clamped.x}px`;
+    effectEl.style.top = `${clamped.y}px`;
   }
 
   function battleEffectPanelCandidates(seat, panelRect, size, viewportWidth, viewportHeight) {
@@ -1889,7 +1906,12 @@
       return;
     }
     const seat = battleEffectSeat(gameState, playerIndex);
-    const size = fitSideBattleEffect(effectEl, seat, panelRect, viewportWidth);
+    if (seat === "shimocha" || seat === "kamicha") {
+      positionSideBattleEffect(effectEl, seat, panelRect, bounds, viewportWidth, viewportHeight);
+      return;
+    }
+    effectEl.style.removeProperty("font-size");
+    const size = battleEffectMeasuredSize(effectEl);
     const protectedPanelRect = expandRect(panelRect, EFFECT_PANEL_MARGIN);
     const candidates = battleEffectPanelCandidates(seat, panelRect, size, viewportWidth, viewportHeight);
     const normalizedCandidates = candidates.map((candidate) => {
