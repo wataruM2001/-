@@ -830,11 +830,35 @@
     return "";
   }
 
+  function getLimitNameClass(limitName) {
+    switch (limitName) {
+      case "跳満":
+        return "limit-haneman";
+      case "倍満":
+        return "limit-baiman";
+      case "三倍満":
+        return "limit-sanbaiman";
+      case "数え役満":
+        return "limit-kazoe";
+      case "役満":
+        return "limit-yakuman";
+      default:
+        return "";
+    }
+  }
+
+  function formatLimitNamePrefix(limitName) {
+    if (!limitName) return "";
+    const limitClass = getLimitNameClass(limitName);
+    if (!limitClass) return `${escapeHtml(limitName)} `;
+    return `<span class="limit-name ${limitClass}">${escapeHtml(limitName)}</span> `;
+  }
+
   function formatWinPointText(evaluation, winType) {
     const points = evaluation?.best?.points;
     if (!points) return "点数：-";
     const limitName = getLimitName(evaluation);
-    const prefix = limitName ? `${limitName} ` : "";
+    const prefix = formatLimitNamePrefix(limitName);
     if (points.isTsumo || winType === "tsumo") {
       const parentPayment = points.payments?.find((payment) => payment.payer === "parent")?.amount;
       const childPayment = points.payments?.find((payment) => payment.payer === "child")?.amount;
@@ -1506,7 +1530,7 @@
                 ${wins.length > 1 ? `<strong>${escapeHtml(win.title)}</strong>` : ""}
                 ${renderResultDoraIndicatorRow(win, result)}
                 <div class="result-detail-text">${escapeHtml(win.yakuText)}</div>
-                <div class="result-detail-text">${escapeHtml(win.pointText)}</div>
+                <div class="result-detail-text">${win.pointText}</div>
                 ${renderResultHandTiles(win)}
                 ${renderResultMelds(win)}
                 ${renderResultFlowers(win)}
