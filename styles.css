@@ -810,6 +810,65 @@ button {
   line-height: 1.25;
 }
 
+.limit-name {
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.85),
+    0 0 10px rgba(255, 255, 255, 0.25);
+}
+
+.limit-haneman,
+.limit-baiman {
+  color: #ff4a3d;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.9),
+    0 0 10px rgba(255, 60, 40, 0.75),
+    0 0 20px rgba(255, 20, 20, 0.45);
+}
+
+.limit-sanbaiman,
+.limit-kazoe {
+  color: #ffd66b;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.9),
+    0 0 12px rgba(255, 220, 90, 0.85),
+    0 0 24px rgba(255, 180, 40, 0.5);
+}
+
+.limit-yakuman {
+  font-weight: 950;
+  background: linear-gradient(
+    90deg,
+    #ff3b30,
+    #ffcc00,
+    #34c759,
+    #00c7ff,
+    #5856d6,
+    #ff2d95,
+    #ff3b30
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.95),
+    0 0 14px rgba(255, 255, 255, 0.55),
+    0 0 30px rgba(255, 120, 220, 0.55);
+  animation: yakumanRainbowText 2.4s linear infinite;
+}
+
+@keyframes yakumanRainbowText {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: 220% 50%;
+  }
+}
+
 .result-tile-row,
 .result-meld-row {
   display: flex;
