@@ -106,13 +106,12 @@
     paifuTitle: document.getElementById("paifuTitle"),
     paifuStepLabel: document.getElementById("paifuStepLabel"),
     paifuActionText: document.getElementById("paifuActionText"),
-    paifuHandSelect: document.getElementById("paifuHandSelect"),
-    paifuFirstButton: document.getElementById("paifuFirstButton"),
+    paifuPrevHandButton: document.getElementById("paifuPrevHandButton"),
+    paifuPrevSelfDrawButton: document.getElementById("paifuPrevSelfDrawButton"),
     paifuPrevButton: document.getElementById("paifuPrevButton"),
     paifuNextButton: document.getElementById("paifuNextButton"),
-    paifuLastButton: document.getElementById("paifuLastButton"),
-    paifuPlayButton: document.getElementById("paifuPlayButton"),
-    paifuStopButton: document.getElementById("paifuStopButton"),
+    paifuNextSelfDrawButton: document.getElementById("paifuNextSelfDrawButton"),
+    paifuNextHandButton: document.getElementById("paifuNextHandButton"),
     paifuBackButton: document.getElementById("paifuBackButton"),
     rulesScreen: document.getElementById("rulesScreen"),
     rulesBackButton: document.getElementById("rulesBackButton"),
@@ -293,9 +292,13 @@
       settlementBreakdownVisible = !settlementBreakdownVisible;
       renderBattleSettlementPanel();
     });
-    els.paifuFirstButton?.addEventListener("click", () => {
+    els.paifuPrevHandButton?.addEventListener("click", () => {
       stopPaifuPlayback();
-      setPaifuPosition(0, 0);
+      movePaifuHand(-1);
+    });
+    els.paifuPrevSelfDrawButton?.addEventListener("click", () => {
+      stopPaifuPlayback();
+      movePaifuSelfDraw(-1);
     });
     els.paifuPrevButton?.addEventListener("click", () => {
       stopPaifuPlayback();
@@ -305,24 +308,18 @@
       stopPaifuPlayback();
       movePaifuStep(1);
     });
-    els.paifuLastButton?.addEventListener("click", () => {
+    els.paifuNextSelfDrawButton?.addEventListener("click", () => {
       stopPaifuPlayback();
-      movePaifuToLast();
+      movePaifuSelfDraw(1);
     });
-    els.paifuPlayButton?.addEventListener("click", () => {
-      startPaifuPlayback();
-    });
-    els.paifuStopButton?.addEventListener("click", () => {
+    els.paifuNextHandButton?.addEventListener("click", () => {
       stopPaifuPlayback();
+      movePaifuHand(1);
     });
     els.paifuBackButton?.addEventListener("click", () => {
       stopPaifuPlayback();
       appScreen = "settlement";
       renderBattleTable();
-    });
-    els.paifuHandSelect?.addEventListener("change", () => {
-      stopPaifuPlayback();
-      setPaifuPosition(Number(els.paifuHandSelect.value) || 0, 0);
     });
     els.battleSelfHand?.addEventListener("click", (event) => {
       const tileImage = event.target.closest("[data-discard-tile-id]");
@@ -1489,6 +1486,60 @@
     renderBattleTable();
   }
 
+  function flattenPaifuSnapshots() {
+    if (!hasPaifuSnapshots()) return [];
+    return paifuReplay.hands.flatMap((hand, handIndex) =>
+      (hand.snapshots || []).map((snapshot, stepIndex) => ({
+        handIndex,
+        stepIndex,
+        snapshot,
+      }))
+    );
+  }
+
+  function currentPaifuFlatIndex(flatSnapshots = flattenPaifuSnapshots()) {
+    return flatSnapshots.findIndex((entry) => entry.handIndex === paifuHandIndex && entry.stepIndex === paifuStepIndex);
+  }
+
+  function setPaifuFlatIndex(flatIndex) {
+    const flatSnapshots = flattenPaifuSnapshots();
+    const entry = flatSnapshots[flatIndex];
+    if (!entry) return;
+    setPaifuPosition(entry.handIndex, entry.stepIndex);
+  }
+
+  function movePaifuHand(offset) {
+    if (!hasPaifuSnapshots()) return;
+    const nextHandIndex = paifuHandIndex + offset;
+    if (nextHandIndex < 0 || nextHandIndex >= paifuReplay.hands.length) return;
+    setPaifuPosition(nextHandIndex, 0);
+  }
+
+  function isSelfDrawSnapshot(snapshot) {
+    if (snapshot?.actionType !== "draw") return false;
+    const actionIndex = Number.isInteger(snapshot.actionPlayerIndex) ? snapshot.actionPlayerIndex : snapshot.currentPlayerIndex;
+    if (actionIndex === 0) return true;
+    const actionPlayerId = snapshot.actionPlayerId || snapshot.currentPlayerId;
+    const selfPlayerId = (snapshot.players || []).find((player) => player?.seat === "self" || player?.index === 0)?.id;
+    return Boolean(actionPlayerId && selfPlayerId && actionPlayerId === selfPlayerId);
+  }
+
+  function findPaifuSelfDrawFlatIndex(direction) {
+    const flatSnapshots = flattenPaifuSnapshots();
+    const currentFlatIndex = currentPaifuFlatIndex(flatSnapshots);
+    if (currentFlatIndex < 0) return -1;
+    for (let index = currentFlatIndex + direction; index >= 0 && index < flatSnapshots.length; index += direction) {
+      if (isSelfDrawSnapshot(flatSnapshots[index]?.snapshot)) return index;
+    }
+    return -1;
+  }
+
+  function movePaifuSelfDraw(direction) {
+    const targetIndex = findPaifuSelfDrawFlatIndex(direction);
+    if (targetIndex < 0) return;
+    setPaifuFlatIndex(targetIndex);
+  }
+
   function movePaifuStep(offset) {
     if (!hasPaifuSnapshots()) return;
     const hand = currentPaifuHand();
@@ -2605,23 +2656,16 @@
       `${paifuHandIndex + 1}/${paifuReplay.hands.length}局  ${paifuStepIndex + 1}/${hand.snapshots.length}手`
     );
     setTextIfChanged(els.paifuActionText, paifuDisplayActionText(snapshot, hand));
-    if (els.paifuHandSelect) {
-      const options = paifuReplay.hands
-        .map((entry, index) => {
-          const selected = index === paifuHandIndex ? " selected" : "";
-          return `<option value="${index}"${selected}>${escapeHtml(entry.roundLabel)}${entry.honba}本場</option>`;
-        })
-        .join("");
-      setHtmlIfChanged(els.paifuHandSelect, options);
-    }
-    const firstDisabled = paifuHandIndex === 0 && paifuStepIndex === 0;
-    const lastDisabled = isPaifuAtLast();
-    if (els.paifuFirstButton) els.paifuFirstButton.disabled = firstDisabled;
+    const flatSnapshots = flattenPaifuSnapshots();
+    const currentFlatIndex = currentPaifuFlatIndex(flatSnapshots);
+    const firstDisabled = currentFlatIndex <= 0;
+    const lastDisabled = currentFlatIndex < 0 || currentFlatIndex >= flatSnapshots.length - 1;
+    if (els.paifuPrevHandButton) els.paifuPrevHandButton.disabled = paifuHandIndex <= 0;
+    if (els.paifuPrevSelfDrawButton) els.paifuPrevSelfDrawButton.disabled = findPaifuSelfDrawFlatIndex(-1) < 0;
     if (els.paifuPrevButton) els.paifuPrevButton.disabled = firstDisabled;
     if (els.paifuNextButton) els.paifuNextButton.disabled = lastDisabled;
-    if (els.paifuLastButton) els.paifuLastButton.disabled = lastDisabled;
-    if (els.paifuPlayButton) els.paifuPlayButton.disabled = Boolean(paifuReplayTimer) || lastDisabled;
-    if (els.paifuStopButton) els.paifuStopButton.disabled = !paifuReplayTimer;
+    if (els.paifuNextSelfDrawButton) els.paifuNextSelfDrawButton.disabled = findPaifuSelfDrawFlatIndex(1) < 0;
+    if (els.paifuNextHandButton) els.paifuNextHandButton.disabled = paifuHandIndex >= paifuReplay.hands.length - 1;
   }
 
   function paifuDisplayActionText(snapshot, hand) {

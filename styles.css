@@ -846,13 +846,14 @@ button {
   backdrop-filter: blur(4px);
 }
 
-.paifu-controls .mini-button {
+.paifu-controls .paifu-nav-button {
   min-width: auto;
   min-height: 28px;
   height: 28px;
   padding: 0 10px;
   font-size: 12px;
   line-height: 1;
+  border-radius: 999px;
   box-shadow:
     0 0 7px rgba(243, 216, 142, 0.18),
     0 2px 0 rgba(0, 0, 0, 0.72),
@@ -888,7 +889,7 @@ button {
     border-radius: 14px;
   }
 
-  .paifu-controls .mini-button {
+  .paifu-controls .paifu-nav-button {
     min-height: 26px;
     height: 26px;
     padding: 0 8px;

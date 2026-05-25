@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>マーチャオサンマ</title>
-    <link rel="stylesheet" href="./styles.css?v=paifu-control-bar-v1" />
+    <link rel="stylesheet" href="./styles.css?v=paifu-nav-v1" />
   </head>
   <body>
     <main class="app-shell">
@@ -45,17 +45,13 @@
             <p class="paifu-step-label" id="paifuStepLabel">-</p>
             <div class="paifu-action-text" id="paifuActionText" hidden>-</div>
             <div class="paifu-controls">
-              <button class="mini-button" id="paifuFirstButton" type="button">最初へ</button>
-              <button class="mini-button" id="paifuPrevButton" type="button">前へ</button>
-              <button class="mini-button" id="paifuNextButton" type="button">次へ</button>
-              <label class="paifu-hand-select-label">
-                <span>局選択</span>
-                <select id="paifuHandSelect"></select>
-              </label>
-              <button class="mini-button" id="paifuLastButton" type="button" hidden>最後へ</button>
-              <button class="mini-button" id="paifuPlayButton" type="button" hidden>再生</button>
-              <button class="mini-button" id="paifuStopButton" type="button" hidden>停止</button>
-              <button class="mini-button" id="paifuBackButton" type="button">戻る</button>
+              <button class="mini-button paifu-nav-button" id="paifuPrevHandButton" type="button">前局</button>
+              <button class="mini-button paifu-nav-button" id="paifuPrevSelfDrawButton" type="button">前巡</button>
+              <button class="mini-button paifu-nav-button" id="paifuPrevButton" type="button">前</button>
+              <button class="mini-button paifu-nav-button" id="paifuNextButton" type="button">次</button>
+              <button class="mini-button paifu-nav-button" id="paifuNextSelfDrawButton" type="button">次巡</button>
+              <button class="mini-button paifu-nav-button" id="paifuNextHandButton" type="button">次局</button>
+              <button class="primary-button paifu-nav-button" id="paifuBackButton" type="button">終了</button>
             </div>
           </section>
           <section class="rules-screen" id="rulesScreen" hidden>
