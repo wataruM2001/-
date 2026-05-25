@@ -3054,6 +3054,23 @@ button:disabled:hover,
   backdrop-filter: blur(8px);
 }
 
+.battle-result-panel:not(.result-transparent) {
+  top: var(--result-panel-top, 18%);
+  height: var(--result-panel-height, 70svh);
+  max-height: none;
+  transform: translateX(-50%);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.battle-result-panel:not(.result-transparent) .battle-result-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
 .battle-result-panel h2,
 .battle-settlement-panel h2,
 .battle-result-panel h3 {
