@@ -1872,11 +1872,16 @@
     return tiles;
   }
 
-  function renderMeldTile(tile, classes = "", useBack = false) {
+  function renderMeldTileImage(tile, classes = "", useBack = false) {
     if (!tile && !useBack) return "";
     const src = useBack ? Tiles.tileImagePath("blue_back") : tile.image;
     const label = useBack ? "裏向き牌" : tile.name || tile.baseId || tile.id;
     return `<img class="table-tile-img meld-tile ${classes}" src="${escapeHtml(src)}" alt="${escapeHtml(label)}" loading="lazy" />`;
+  }
+
+  function renderMeldTile(tile, classes = "", useBack = false) {
+    const slotClass = classes.includes("called-tile") ? " called-slot" : "";
+    return `<span class="meld-tile-slot${slotClass}">${renderMeldTileImage(tile, classes, useBack)}</span>`;
   }
 
   function renderMeld(meld) {
@@ -1900,9 +1905,11 @@
           .map((tile, index) => {
             if (meld.type === "kakan" && index === calledIndex && meld.addedTile) {
               return `
-                <span class="called-tile-stack">
-                  ${renderMeldTile(tile, "called-tile")}
-                  ${renderMeldTile(meld.addedTile, "called-tile added-kan-tile")}
+                <span class="meld-tile-slot called-stack-slot">
+                  <span class="called-tile-stack">
+                    ${renderMeldTileImage(tile, "called-tile")}
+                    ${renderMeldTileImage(meld.addedTile, "called-tile added-kan-tile")}
+                  </span>
                 </span>
               `;
             }
@@ -1914,7 +1921,7 @@
   }
 
   function renderPlayerMelds(player) {
-    return (player?.melds || []).map(renderMeld).join("");
+    return [...(player?.melds || [])].reverse().map(renderMeld).join("");
   }
 
   function orderDiscardsForRiver(player) {
