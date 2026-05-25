@@ -96,12 +96,21 @@
     return url.toString();
   }
 
-  function normalizeShareRow({ shareId, title, paifu, settlement, isPublic }) {
+  function normalizeShareRow({ shareId, title, paifu, settlement, isPublic, rulesVersion, appVersion }) {
+    const normalizedShareId = shareId || createShareId();
+    const sharedUrl = buildPaifuShareUrl(normalizedShareId);
+    const paifuJson = cloneJson(paifu || null);
+    if (paifuJson && typeof paifuJson === "object" && !Array.isArray(paifuJson)) {
+      paifuJson.shareId = normalizedShareId;
+      paifuJson.sharedUrl = sharedUrl;
+    }
     return {
-      share_id: shareId || createShareId(),
+      share_id: normalizedShareId,
       created_at: new Date().toISOString(),
+      rules_version: rulesVersion || "marchao-sanma-v1",
+      app_version: appVersion || "browser-static-v1",
       title: title || "マーチャオサンマ牌譜",
-      paifu_json: cloneJson(paifu || null),
+      paifu_json: paifuJson,
       settlement_json: cloneJson(settlement || null),
       is_public: isPublic !== false,
     };
@@ -110,16 +119,42 @@
   const paifuShareApi = {
     isConfigured,
     buildShareUrl: buildPaifuShareUrl,
+    getSharedUrl: buildPaifuShareUrl,
 
-    async createSharedPaifu({ title, paifu, settlement, isPublic = true, shareId = "" } = {}) {
+    async createSharedPaifu(options = {}, maybeSettlementResult = null) {
+      if (options?.hands) {
+        options = {
+          paifuReplay: options,
+          settlementResult: maybeSettlementResult,
+        };
+      }
+      const {
+        title,
+        paifu,
+        paifuReplay,
+        settlement,
+        settlementResult,
+        isPublic = true,
+        shareId = "",
+        rulesVersion = "marchao-sanma-v1",
+        appVersion = "browser-static-v1",
+      } = options || {};
       const client = getSupabaseClient();
       if (!client) return unavailableResult("createSharedPaifu");
 
-      const row = normalizeShareRow({ shareId, title, paifu, settlement, isPublic });
+      const row = normalizeShareRow({
+        shareId,
+        title,
+        paifu: paifuReplay || paifu,
+        settlement: settlementResult || settlement,
+        isPublic,
+        rulesVersion,
+        appVersion,
+      });
       const { data, error } = await client
         .from(supabaseConfig.sharedPaifusTable)
         .insert(row)
-        .select("share_id,created_at,title,is_public")
+        .select("share_id,created_at,rules_version,app_version,title,is_public")
         .single();
 
       if (error) {
@@ -142,7 +177,7 @@
 
       const { data, error } = await client
         .from(supabaseConfig.sharedPaifusTable)
-        .select("share_id,created_at,title,paifu_json,settlement_json,is_public")
+        .select("share_id,created_at,rules_version,app_version,title,paifu_json,settlement_json,is_public")
         .eq("share_id", shareId)
         .eq("is_public", true)
         .single();
@@ -154,11 +189,21 @@
       return {
         ok: true,
         shareId: data.share_id,
+        createdAt: data.created_at,
+        rulesVersion: data.rules_version,
+        appVersion: data.app_version,
         title: data.title,
         paifu: data.paifu_json,
+        paifuReplay: data.paifu_json,
         settlement: data.settlement_json,
+        settlementResult: data.settlement_json,
         data,
       };
+    },
+
+    async getSharedPaifu(input) {
+      const shareId = typeof input === "string" ? input : input?.shareId;
+      return this.loadSharedPaifu(shareId);
     },
   };
 

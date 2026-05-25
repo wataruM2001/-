@@ -38,7 +38,8 @@
             <div class="battle-settlement-body" id="battleSettlementBody"></div>
             <button class="primary-button battle-result-button" id="battleSettlementDetailButton" type="button">精算内訳</button>
             <button class="primary-button battle-result-button" id="battlePaifuButton" type="button">牌譜を見る</button>
-            <button class="mini-button battle-result-button" id="battleSharePaifuButton" type="button">牌譜共有</button>
+            <button class="mini-button battle-result-button" id="battleSharePaifuButton" type="button">牌譜URLを作成</button>
+            <button class="mini-button battle-result-button" id="battleCopyPaifuUrlButton" type="button" hidden>コピー</button>
             <p class="battle-share-status" id="battleSharePaifuStatus" aria-live="polite"></p>
             <button class="primary-button battle-result-button" id="battleRestartButton" type="button">もう一度対局</button>
           </section>
@@ -431,7 +432,7 @@
     <script src="./rules.js?v=settlement-chip-score-v1"></script>
     <script src="./hand-evaluation.js?v=dora-indicator-manchu-flower"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./supabaseClient.js?v=supabase-share-url-v1"></script>
-    <script src="./app.js?v=supabase-foundation-v1"></script>
+    <script src="./supabaseClient.js?v=shared-paifu-url-v1"></script>
+    <script src="./app.js?v=shared-paifu-url-v1"></script>
   </body>
 </html>

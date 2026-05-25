@@ -4,11 +4,19 @@
 create table if not exists public.shared_paifus (
   share_id text primary key,
   created_at timestamptz not null default now(),
+  rules_version text not null default 'marchao-sanma-v1',
+  app_version text,
   title text not null,
   paifu_json jsonb not null,
   settlement_json jsonb,
   is_public boolean not null default true
 );
+
+alter table public.shared_paifus
+  add column if not exists rules_version text not null default 'marchao-sanma-v1';
+
+alter table public.shared_paifus
+  add column if not exists app_version text;
 
 create index if not exists shared_paifus_public_created_at_idx
   on public.shared_paifus (is_public, created_at desc);

@@ -14,6 +14,8 @@
   const AFTER_DISCARD_REACTION_DELAY_MS = 50;
   const PAIFU_REPLAY_INTERVAL_MS = 1000;
   const PAIFU_STORAGE_KEY = "marchao-sanma-last-paifu-v1";
+  const APP_VERSION = "shared-paifu-url-v1";
+  const RULES_VERSION = "marchao-sanma-v1";
   const RESULT_YAKU_NAME_MAP = {
     riichi: "立直",
     double_riichi: "ダブル立直",
@@ -84,6 +86,8 @@
   let paifuReplayTimer = 0;
   let lastPaifuSnapshotSignature = "";
   let lastSavedStatsHanchanId = "";
+  let isViewingSharedPaifu = false;
+  let currentSharedPaifuUrl = "";
 
   const els = {
     undoButton: document.getElementById("undoButton"),
@@ -103,6 +107,7 @@
     battleSettlementDetailButton: document.getElementById("battleSettlementDetailButton"),
     battlePaifuButton: document.getElementById("battlePaifuButton"),
     battleSharePaifuButton: document.getElementById("battleSharePaifuButton"),
+    battleCopyPaifuUrlButton: document.getElementById("battleCopyPaifuUrlButton"),
     battleSharePaifuStatus: document.getElementById("battleSharePaifuStatus"),
     battleRestartButton: document.getElementById("battleRestartButton"),
     paifuPanel: document.getElementById("paifuPanel"),
@@ -295,6 +300,9 @@
     els.battleSharePaifuButton?.addEventListener("click", () => {
       handleSharePaifu();
     });
+    els.battleCopyPaifuUrlButton?.addEventListener("click", () => {
+      copySharedPaifuUrl();
+    });
     els.battleSettlementDetailButton?.addEventListener("click", () => {
       settlementBreakdownVisible = !settlementBreakdownVisible;
       renderBattleSettlementPanel();
@@ -325,7 +333,7 @@
     });
     els.paifuBackButton?.addEventListener("click", () => {
       stopPaifuPlayback();
-      appScreen = "settlement";
+      appScreen = isViewingSharedPaifu ? "start" : "settlement";
       renderBattleTable();
     });
     els.battleSelfHand?.addEventListener("click", (event) => {
@@ -560,6 +568,8 @@
     appScreen = "playing";
     lastHandResult = null;
     battleSettlement = null;
+    isViewingSharedPaifu = false;
+    currentSharedPaifuUrl = "";
     paifuReplay = createPaifuReplay();
     paifuHandIndex = 0;
     paifuStepIndex = 0;
@@ -1502,6 +1512,24 @@
     els.battleSharePaifuStatus.classList.toggle("is-error", Boolean(isError));
   }
 
+  function updateSharedPaifuUrlUi(url = "") {
+    currentSharedPaifuUrl = url || "";
+    if (els.battleCopyPaifuUrlButton) {
+      setHiddenIfChanged(els.battleCopyPaifuUrlButton, !currentSharedPaifuUrl);
+      els.battleCopyPaifuUrlButton.disabled = !currentSharedPaifuUrl;
+    }
+  }
+
+  async function copySharedPaifuUrl() {
+    if (!currentSharedPaifuUrl) return;
+    try {
+      await navigator.clipboard?.writeText(currentSharedPaifuUrl);
+      showBattleShareStatus(`コピーしました: ${currentSharedPaifuUrl}`);
+    } catch {
+      showBattleShareStatus(`URLを選択してコピーしてください: ${currentSharedPaifuUrl}`, true);
+    }
+  }
+
   async function loadSharedPaifuFromUrl() {
     const shareId = new URLSearchParams(window.location.search).get("paifu");
     if (!shareId) return;
@@ -1510,14 +1538,34 @@
       setTextIfChanged(els.battleStatus, "共有牌譜APIを読み込めませんでした");
       return;
     }
+    clearCpuTurnTimer();
+    clearAfterDiscardTimer();
+    clearResultTransitionTimer();
+    resetBattleEffectState();
+    stopPaifuPlayback();
+    setTextIfChanged(els.battleStatus, "牌譜を読み込み中です…");
     const result = await api.loadSharedPaifu(shareId);
     if (!result.ok) {
-      setTextIfChanged(els.battleStatus, result.reason || "共有牌譜を読み込めませんでした");
+      appScreen = "start";
+      isViewingSharedPaifu = false;
+      setTextIfChanged(
+        els.battleStatus,
+        "牌譜が見つかりませんでした。URLが間違っているか、牌譜が削除された可能性があります。"
+      );
+      renderBattleTable();
       return;
     }
     paifuReplay = parseMaybeJson(result.paifu);
     const loadedSettlement = parseMaybeJson(result.settlement);
     battleSettlement = Array.isArray(loadedSettlement) ? loadedSettlement : null;
+    if (paifuReplay && typeof paifuReplay === "object") {
+      paifuReplay.shareId = result.shareId;
+      paifuReplay.sharedUrl = api.buildShareUrl?.(result.shareId) || api.getSharedUrl?.(result.shareId) || "";
+    }
+    currentSharedPaifuUrl = paifuReplay?.sharedUrl || "";
+    isViewingSharedPaifu = true;
+    battleState = null;
+    lastHandResult = null;
     paifuHandIndex = 0;
     paifuStepIndex = 0;
     appScreen = "paifu";
@@ -1543,24 +1591,31 @@
       showBattleShareStatus("共有APIを読み込めませんでした", true);
       return;
     }
+    if (paifuReplay?.shareId) {
+      const url = paifuReplay.sharedUrl || api.buildShareUrl?.(paifuReplay.shareId) || api.getSharedUrl?.(paifuReplay.shareId);
+      updateSharedPaifuUrlUi(url);
+      showBattleShareStatus(`すでに作成済みです: ${url}`);
+      return;
+    }
     showBattleShareStatus("共有URLを作成中...");
     const settlement = battleSettlement || (battleState ? buildBattleSettlement(battleState) : null);
     const result = await api.createSharedPaifu({
       title: buildPaifuShareTitle(),
-      paifu: paifuReplay,
-      settlement,
+      paifuReplay,
+      settlementResult: settlement,
+      rulesVersion: RULES_VERSION,
+      appVersion: APP_VERSION,
       isPublic: true,
     });
     if (!result.ok) {
       showBattleShareStatus(result.reason || "共有URLを作成できませんでした", true);
       return;
     }
-    try {
-      await navigator.clipboard?.writeText(result.url);
-    } catch {
-      // Clipboard access can be unavailable outside secure browsing contexts.
-    }
-    showBattleShareStatus(`共有URLを作成しました: ${result.url}`);
+    paifuReplay.shareId = result.shareId;
+    paifuReplay.sharedUrl = result.url;
+    finalizePaifuReplay();
+    updateSharedPaifuUrlUi(result.url);
+    showBattleShareStatus(`牌譜URLを作成しました: ${result.url}`);
   }
 
   function selfPlayerIdFromReplay() {
@@ -2203,6 +2258,11 @@
       els.battleSharePaifuButton.disabled = !hasReplay;
       els.battleSharePaifuButton.title = hasReplay ? "" : "牌譜データがありません";
       setHiddenIfChanged(els.battleSharePaifuButton, false);
+    }
+    const existingSharedUrl = paifuReplay?.sharedUrl || (paifuReplay?.shareId && window.paifuShareApi?.buildShareUrl?.(paifuReplay.shareId)) || "";
+    updateSharedPaifuUrlUi(existingSharedUrl);
+    if (existingSharedUrl && els.battleSharePaifuStatus && !els.battleSharePaifuStatus.textContent) {
+      showBattleShareStatus(`作成済み: ${existingSharedUrl}`);
     }
   }
 
