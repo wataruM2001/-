@@ -143,14 +143,14 @@ button {
 }
 
 .battle-surface.is-start-screen {
-  background-image: url("./assets/start-background.png");
+  background-image: url("./assets/start-background.png?v=start-bg-20260525b");
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
 }
 
 .battle-surface.is-rules-screen {
-  background-image: url("./assets/start-background.png");
+  background-image: url("./assets/start-background.png?v=start-bg-20260525b");
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
