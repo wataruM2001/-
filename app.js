@@ -83,6 +83,7 @@
   let paifuStepIndex = 0;
   let paifuReplayTimer = 0;
   let lastPaifuSnapshotSignature = "";
+  let lastSavedStatsHanchanId = "";
 
   const els = {
     undoButton: document.getElementById("undoButton"),
@@ -101,6 +102,8 @@
     battleSettlementBody: document.getElementById("battleSettlementBody"),
     battleSettlementDetailButton: document.getElementById("battleSettlementDetailButton"),
     battlePaifuButton: document.getElementById("battlePaifuButton"),
+    battleSharePaifuButton: document.getElementById("battleSharePaifuButton"),
+    battleSharePaifuStatus: document.getElementById("battleSharePaifuStatus"),
     battleRestartButton: document.getElementById("battleRestartButton"),
     paifuPanel: document.getElementById("paifuPanel"),
     paifuTitle: document.getElementById("paifuTitle"),
@@ -197,6 +200,7 @@
   function init() {
     renderTileGroups();
     bindEvents();
+    loadSharedPaifuFromUrl();
     render();
   }
 
@@ -287,6 +291,9 @@
     });
     els.battlePaifuButton?.addEventListener("click", () => {
       openPaifuScreen();
+    });
+    els.battleSharePaifuButton?.addEventListener("click", () => {
+      handleSharePaifu();
     });
     els.battleSettlementDetailButton?.addEventListener("click", () => {
       settlementBreakdownVisible = !settlementBreakdownVisible;
@@ -557,6 +564,7 @@
     paifuHandIndex = 0;
     paifuStepIndex = 0;
     lastPaifuSnapshotSignature = "";
+    lastSavedStatsHanchanId = "";
     settlementBreakdownVisible = false;
     const initialDealerIndex = randomBattleDealerIndex();
     battleState = createBattleHand({
@@ -1218,6 +1226,7 @@
     if (lastHandResult.isHanchanEnded) {
       battleSettlement = buildBattleSettlement(battleState);
       finalizePaifuReplay();
+      saveCurrentHanchanStatsIfConfigured();
       settlementBreakdownVisible = false;
       appScreen = "settlement";
       renderBattleTable();
@@ -1246,6 +1255,7 @@
     };
     battleSettlement = buildBattleSettlement(battleState);
     finalizePaifuReplay();
+    saveCurrentHanchanStatsIfConfigured();
     settlementBreakdownVisible = false;
     appScreen = "settlement";
     renderBattleTable();
@@ -1388,6 +1398,14 @@
   }
 
   function createPaifuSnapshot(gameState, actionType, actionText, hand, stepIndex) {
+    const action = gameState.lastAction || {};
+    const currentPlayerIndex = Number.isInteger(gameState.currentPlayerIndex) ? gameState.currentPlayerIndex : null;
+    const dealerIndex = Number.isInteger(gameState.dealerIndex) ? gameState.dealerIndex : 0;
+    const actionPlayerIndex = Number.isInteger(action.winnerIndex)
+      ? action.winnerIndex
+      : Number.isInteger(action.playerIndex)
+        ? action.playerIndex
+        : currentPlayerIndex;
     return clonePaifuData({
       snapshotId: `${Date.now()}_${hand.snapshots.length}_${Math.random().toString(36).slice(2, 8)}`,
       handIndex: paifuReplay.hands.indexOf(hand),
@@ -1398,8 +1416,12 @@
       honba: Number(gameState.honba) || 0,
       kyotaku: Math.max(0, Math.floor(Number(gameState.kyotaku) || 0)),
       remainingDraws: Math.max(0, Number(gameState.remainingDraws) || 0),
-      currentPlayerIndex: Number.isInteger(gameState.currentPlayerIndex) ? gameState.currentPlayerIndex : null,
-      dealerIndex: Number.isInteger(gameState.dealerIndex) ? gameState.dealerIndex : 0,
+      currentPlayerIndex,
+      currentPlayerId: Number.isInteger(currentPlayerIndex) ? gameState.players[currentPlayerIndex]?.id || null : null,
+      dealerIndex,
+      dealerId: gameState.players[dealerIndex]?.id || null,
+      actionPlayerIndex: Number.isInteger(actionPlayerIndex) ? actionPlayerIndex : null,
+      actionPlayerId: Number.isInteger(actionPlayerIndex) ? gameState.players[actionPlayerIndex]?.id || null : null,
       actionType,
       actionText,
       players: gameState.players.map((player, index) => paifuPlayerSnapshot(player, index, gameState)),
@@ -1463,6 +1485,133 @@
     } catch (error) {
       console.warn("牌譜を保存できませんでした", error);
     }
+  }
+
+  function parseMaybeJson(value) {
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function showBattleShareStatus(message, isError = false) {
+    if (!els.battleSharePaifuStatus) return;
+    els.battleSharePaifuStatus.textContent = message || "";
+    els.battleSharePaifuStatus.classList.toggle("is-error", Boolean(isError));
+  }
+
+  async function loadSharedPaifuFromUrl() {
+    const shareId = new URLSearchParams(window.location.search).get("paifu");
+    if (!shareId) return;
+    const api = window.paifuShareApi;
+    if (!api?.loadSharedPaifu) {
+      setTextIfChanged(els.battleStatus, "共有牌譜APIを読み込めませんでした");
+      return;
+    }
+    const result = await api.loadSharedPaifu(shareId);
+    if (!result.ok) {
+      setTextIfChanged(els.battleStatus, result.reason || "共有牌譜を読み込めませんでした");
+      return;
+    }
+    paifuReplay = parseMaybeJson(result.paifu);
+    const loadedSettlement = parseMaybeJson(result.settlement);
+    battleSettlement = Array.isArray(loadedSettlement) ? loadedSettlement : null;
+    paifuHandIndex = 0;
+    paifuStepIndex = 0;
+    appScreen = "paifu";
+    renderBattleTable();
+  }
+
+  function buildPaifuShareTitle() {
+    const firstHand = paifuReplay?.hands?.[0];
+    const lastHand = paifuReplay?.hands?.[paifuReplay.hands.length - 1];
+    const range = firstHand && lastHand
+      ? `${firstHand.roundLabel}${firstHand.honba}本場-${lastHand.roundLabel}${lastHand.honba}本場`
+      : "半荘牌譜";
+    return `マーチャオサンマ ${range}`;
+  }
+
+  async function handleSharePaifu() {
+    if (!hasPaifuSnapshots()) {
+      showBattleShareStatus("共有できる牌譜がありません", true);
+      return;
+    }
+    const api = window.paifuShareApi;
+    if (!api?.createSharedPaifu) {
+      showBattleShareStatus("共有APIを読み込めませんでした", true);
+      return;
+    }
+    showBattleShareStatus("共有URLを作成中...");
+    const settlement = battleSettlement || (battleState ? buildBattleSettlement(battleState) : null);
+    const result = await api.createSharedPaifu({
+      title: buildPaifuShareTitle(),
+      paifu: paifuReplay,
+      settlement,
+      isPublic: true,
+    });
+    if (!result.ok) {
+      showBattleShareStatus(result.reason || "共有URLを作成できませんでした", true);
+      return;
+    }
+    try {
+      await navigator.clipboard?.writeText(result.url);
+    } catch {
+      // Clipboard access can be unavailable outside secure browsing contexts.
+    }
+    showBattleShareStatus(`共有URLを作成しました: ${result.url}`);
+  }
+
+  function selfPlayerIdFromReplay() {
+    const snapshot = paifuReplay?.hands?.[0]?.snapshots?.[0];
+    return snapshot?.players?.find((player) => player?.index === 0 || player?.seat === "self")?.id || battleState?.players?.[0]?.id || "";
+  }
+
+  function countSelfWinAndDealIn(selfPlayerId) {
+    const counts = { winCount: 0, dealInCount: 0 };
+    if (!selfPlayerId) return counts;
+    (paifuReplay?.hands || []).forEach((hand) => {
+      const result = hand?.result || {};
+      const winnerIds = Array.isArray(result.winnerIds)
+        ? result.winnerIds
+        : (result.wins || []).map((win) => win?.winnerId).filter(Boolean);
+      if (winnerIds.includes(selfPlayerId)) counts.winCount += 1;
+      if ((result.type === "ron" || winnerIds.length > 0) && result.loserId === selfPlayerId) {
+        counts.dealInCount += 1;
+      }
+    });
+    return counts;
+  }
+
+  function buildHanchanStatsRow(settlement) {
+    const selfSettlement = (settlement || []).find((item) => item.index === 0) || null;
+    if (!selfSettlement || !paifuReplay?.id) return null;
+    const selfPlayerId = selfPlayerIdFromReplay();
+    const counts = countSelfWinAndDealIn(selfPlayerId);
+    return {
+      hanchan_id: paifuReplay.id,
+      rank: Number(selfSettlement.rank) || 0,
+      settlement_point: Number(selfSettlement.displayFinalPoint ?? selfSettlement.finalScore) || 0,
+      chip_count: Math.round((Number(selfSettlement.chips) || 0) / 500),
+      total_hands: paifuReplay.hands?.length || 0,
+      win_count: counts.winCount,
+      deal_in_count: counts.dealInCount,
+    };
+  }
+
+  function saveCurrentHanchanStatsIfConfigured() {
+    if (!window.statsApi?.saveHanchanStats || !window.statsApi.isConfigured?.()) return;
+    if (!battleSettlement || !paifuReplay?.id || lastSavedStatsHanchanId === paifuReplay.id) return;
+    const row = buildHanchanStatsRow(battleSettlement);
+    if (!row) return;
+    lastSavedStatsHanchanId = paifuReplay.id;
+    window.statsApi.saveHanchanStats(row).then((result) => {
+      if (!result.ok) {
+        lastSavedStatsHanchanId = "";
+        console.warn("半荘成績を保存できませんでした", result.reason || result.error);
+      }
+    });
   }
 
   function hasPaifuSnapshots() {
@@ -2048,6 +2197,12 @@
       els.battlePaifuButton.disabled = !hasReplay;
       els.battlePaifuButton.title = hasReplay ? "" : "牌譜データがありません";
       setHiddenIfChanged(els.battlePaifuButton, false);
+    }
+    if (els.battleSharePaifuButton) {
+      const hasReplay = hasPaifuSnapshots();
+      els.battleSharePaifuButton.disabled = !hasReplay;
+      els.battleSharePaifuButton.title = hasReplay ? "" : "牌譜データがありません";
+      setHiddenIfChanged(els.battleSharePaifuButton, false);
     }
   }
 

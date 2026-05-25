@@ -1231,6 +1231,18 @@ button {
   font-size: 0.9rem;
 }
 
+.battle-share-status {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.battle-share-status.is-error {
+  color: #ff9a8f;
+}
+
 .opponent-hand {
   position: absolute;
   top: 9%;

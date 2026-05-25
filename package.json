@@ -1,0 +1,19 @@
+{
+  "name": "mahjong-app",
+  "version": "1.0.0",
+  "description": "添付 Google Docs / Google Sheets のルールを元にした、3人麻雀の半荘スコア管理アプリです。",
+  "main": "app.js",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 4173 --strictPort"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "vite": "^8.0.13"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.2"
+  }
+}
