@@ -8,6 +8,7 @@
   "use strict";
 
   const TILE_IMAGE_BASE = "./tiles/";
+  const FLOWER_IMAGE_VERSION = "flower-ma";
   const BACK_TILE_IMAGE = `${TILE_IMAGE_BASE}blue_back.png`;
 
   /**
@@ -24,7 +25,8 @@
    */
 
   function image(fileName) {
-    return `${TILE_IMAGE_BASE}${fileName}`;
+    const cacheSuffix = fileName.startsWith("flower_") ? `?v=${FLOWER_IMAGE_VERSION}` : "";
+    return `${TILE_IMAGE_BASE}${fileName}${cacheSuffix}`;
   }
 
   function tileKind(id, baseId, suit, number, color, bonusHan, label) {
