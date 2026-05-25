@@ -1718,7 +1718,7 @@
   function battleEffectItemsForAction(gameState) {
     const action = gameState?.lastAction;
     if (!action) return [];
-    const playerIndex = battleEffectPlayerIndex(gameState, action);
+    const playerIndex = action.type === "ryukyoku" ? null : battleEffectPlayerIndex(gameState, action);
     const flowers = Array.isArray(action.flowers) ? action.flowers : [];
     const flowerItems = flowers.map((tileId) => ({
       text: "マーチャオ",
@@ -1737,14 +1737,6 @@
       ? [{ text: effectText, playerIndex, classes: battleEffectClassForAction(action, effectText) }]
       : [];
     return [...flowerItems, ...actionEffect];
-  }
-
-  function riverElementForEffect(gameState, playerIndex) {
-    const seat = gameState?.players?.[playerIndex]?.seat;
-    if (seat === "self") return els.battleSelfRiver;
-    if (seat === "shimocha") return els.battleRightRiver;
-    if (seat === "kamicha") return els.battleLeftRiver;
-    return els.battleSelfRiver;
   }
 
   function clampNumber(value, min, max) {
@@ -1812,41 +1804,58 @@
     return rect;
   }
 
+  function battleEffectSeat(gameState, playerIndex) {
+    if (!Number.isInteger(playerIndex)) return "self";
+    return gameState?.players?.[playerIndex]?.seat || "self";
+  }
+
+  function battleEffectPanelCandidates(seat, panelRect, size, viewportWidth, viewportHeight) {
+    const panelCenter = {
+      x: panelRect.left + panelRect.width / 2,
+      y: panelRect.top + panelRect.height / 2,
+    };
+    const below = {
+      x: panelCenter.x,
+      y: panelRect.bottom + size.height / 2 + EFFECT_PANEL_MARGIN,
+    };
+    const above = {
+      x: panelCenter.x,
+      y: panelRect.top - size.height / 2 - EFFECT_PANEL_MARGIN,
+    };
+    const right = {
+      x: panelRect.right + size.width / 2 + EFFECT_PANEL_MARGIN,
+      y: panelCenter.y,
+    };
+    const left = {
+      x: panelRect.left - size.width / 2 - EFFECT_PANEL_MARGIN,
+      y: panelCenter.y,
+    };
+    const lowerCenter = { x: viewportWidth / 2, y: viewportHeight * 0.72 };
+    const upperCenter = { x: viewportWidth / 2, y: viewportHeight * 0.25 };
+    const screenCenter = { x: viewportWidth / 2, y: viewportHeight * 0.5 };
+
+    if (seat === "shimocha") return [right, below, above, left, lowerCenter, upperCenter, screenCenter];
+    if (seat === "kamicha") return [left, below, above, right, lowerCenter, upperCenter, screenCenter];
+    return [below, above, right, left, lowerCenter, upperCenter, screenCenter];
+  }
+
   function positionBattleEffect(gameState, playerIndex) {
     if (!els.battleEffect) return;
     const effectEl = els.battleEffect;
-    const target = riverElementForEffect(gameState, playerIndex);
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
     const bounds = { left: 0, top: 0, right: viewportWidth, bottom: viewportHeight };
     const size = battleEffectMeasuredSize(effectEl);
     const panelRect = visibleCenterPanelRect();
     const protectedPanelRect = panelRect ? expandRect(panelRect, EFFECT_PANEL_MARGIN) : null;
-    if (!target) {
+    if (!panelRect) {
       const point = clampEffectPoint({ x: viewportWidth / 2, y: viewportHeight * 0.5 }, size, bounds, EFFECT_SCREEN_MARGIN);
       effectEl.style.left = `${point.x}px`;
       effectEl.style.top = `${point.y}px`;
       return;
     }
-    const targetRect = target.getBoundingClientRect();
-    const targetCenter = {
-      x: targetRect.left + targetRect.width / 2,
-      y: targetRect.top + targetRect.height / 2,
-    };
-    const candidates = [targetCenter];
-    if (panelRect) {
-      candidates.push(
-        { x: viewportWidth / 2, y: panelRect.bottom + size.height / 2 + EFFECT_PANEL_MARGIN },
-        { x: viewportWidth / 2, y: panelRect.top - size.height / 2 - EFFECT_PANEL_MARGIN },
-        { x: panelRect.left - size.width / 2 - EFFECT_PANEL_MARGIN, y: panelRect.top + panelRect.height / 2 },
-        { x: panelRect.right + size.width / 2 + EFFECT_PANEL_MARGIN, y: panelRect.top + panelRect.height / 2 }
-      );
-    }
-    candidates.push(
-      { x: viewportWidth / 2, y: viewportHeight * 0.25 },
-      { x: viewportWidth / 2, y: viewportHeight * 0.72 },
-      { x: viewportWidth / 2, y: viewportHeight * 0.5 }
-    );
+    const seat = battleEffectSeat(gameState, playerIndex);
+    const candidates = battleEffectPanelCandidates(seat, panelRect, size, viewportWidth, viewportHeight);
     const normalizedCandidates = candidates.map((candidate) => {
       const point = clampEffectPoint(candidate, size, bounds, EFFECT_SCREEN_MARGIN);
       return { point, rect: effectRectFromCenter(size, point.x, point.y) };
