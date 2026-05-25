@@ -11,6 +11,7 @@
   const EFFECT_SCREEN_MARGIN = 16;
   const EFFECT_PANEL_MARGIN = 16;
   const CPU_DISCARD_DELAY_MS = 1500;
+  const RIICHI_AUTO_DISCARD_DELAY_MS = 2000;
   const AFTER_DISCARD_REACTION_DELAY_MS = 50;
   const PAIFU_REPLAY_INTERVAL_MS = 1000;
   const PAIFU_STORAGE_KEY = "marchao-sanma-last-paifu-v1";
@@ -72,6 +73,7 @@
   let lastHandResult = null;
   let battleSettlement = null;
   let cpuTurnTimer = 0;
+  let riichiAutoDiscardTimer = 0;
   let afterDiscardTimer = 0;
   let resultTransitionTimer = 0;
   let battleEffectTimer = 0;
@@ -225,6 +227,11 @@
   function clearCpuTurnTimer() {
     window.clearTimeout(cpuTurnTimer);
     cpuTurnTimer = 0;
+  }
+
+  function clearRiichiAutoDiscardTimer() {
+    window.clearTimeout(riichiAutoDiscardTimer);
+    riichiAutoDiscardTimer = 0;
   }
 
   function clearAfterDiscardTimer() {
@@ -532,6 +539,7 @@
       return;
     }
     clearCpuTurnTimer();
+    clearRiichiAutoDiscardTimer();
     clearAfterDiscardTimer();
     clearResultTransitionTimer();
     resetBattleEffectState();
@@ -561,6 +569,7 @@
       return;
     }
     clearCpuTurnTimer();
+    clearRiichiAutoDiscardTimer();
     clearAfterDiscardTimer();
     clearResultTransitionTimer();
     resetBattleEffectState();
@@ -625,6 +634,7 @@
     if (battleState.phase !== "discard") return;
     const currentPlayer = battleState.players[battleState.currentPlayerIndex];
     if (currentPlayer?.seat !== "self") return;
+    if (currentPlayer?.isRiichi && !battleState.riichiDeclaration) return;
     try {
       battleState = Game.discardTile(battleState, battleState.currentPlayerIndex, tileId);
       renderBattleStateAndScheduleNext();
@@ -691,6 +701,7 @@
       scheduleAfterVisibleDiscard();
       return;
     }
+    scheduleSelfRiichiAutoDiscard();
     scheduleCpuTurn();
   }
 
@@ -711,6 +722,26 @@
     const currentPlayer = battleState.players[battleState.currentPlayerIndex];
     if (!currentPlayer?.isCpu) return;
     cpuTurnTimer = window.setTimeout(runCpuTurn, CPU_DISCARD_DELAY_MS);
+  }
+
+  function isSelfRiichiAutoDiscardTurn(gameState) {
+    if (!gameState || appScreen !== "playing" || gameState.phase !== "discard") return false;
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    return Boolean(currentPlayer?.seat === "self" && currentPlayer.isRiichi && !gameState.pendingAction);
+  }
+
+  function scheduleSelfRiichiAutoDiscard() {
+    clearRiichiAutoDiscardTimer();
+    if (!isSelfRiichiAutoDiscardTurn(battleState)) return;
+    riichiAutoDiscardTimer = window.setTimeout(runSelfRiichiAutoDiscard, RIICHI_AUTO_DISCARD_DELAY_MS);
+  }
+
+  function runSelfRiichiAutoDiscard() {
+    riichiAutoDiscardTimer = 0;
+    if (!isSelfRiichiAutoDiscardTurn(battleState)) return;
+    const currentPlayer = battleState.players[battleState.currentPlayerIndex];
+    battleState = Game.handleRiichiDraw(currentPlayer, battleState);
+    renderBattleStateAndScheduleNext();
   }
 
   function runCpuTurn() {
@@ -738,6 +769,7 @@
   function enterResultIfHandEnded() {
     if (!battleState || !["result", "ryukyoku"].includes(battleState.phase)) return false;
     clearCpuTurnTimer();
+    clearRiichiAutoDiscardTimer();
     clearAfterDiscardTimer();
     if (appScreen === "result") return true;
     if (battleState.phase === "ryukyoku") {
@@ -1273,6 +1305,7 @@
 
   function startNextBattleHand(nextRound) {
     clearCpuTurnTimer();
+    clearRiichiAutoDiscardTimer();
     clearAfterDiscardTimer();
     clearResultTransitionTimer();
     resetBattleEffectState();
@@ -1539,6 +1572,7 @@
       return;
     }
     clearCpuTurnTimer();
+    clearRiichiAutoDiscardTimer();
     clearAfterDiscardTimer();
     clearResultTransitionTimer();
     resetBattleEffectState();
@@ -1793,6 +1827,7 @@
   function openPaifuScreen() {
     if (!hasPaifuSnapshots()) return;
     clearCpuTurnTimer();
+    clearRiichiAutoDiscardTimer();
     clearAfterDiscardTimer();
     clearResultTransitionTimer();
     resetBattleEffectState();
@@ -2965,6 +3000,7 @@
     const canDiscard =
       (battleState.phase === "discard" || Game.canDiscardDuringActionPending?.(battleState)) &&
       currentPlayer?.seat === "self" &&
+      (!currentPlayer?.isRiichi || Boolean(battleState.riichiDeclaration)) &&
       (!battleState.riichiDeclaration ||
         battleState.riichiDeclaration.playerIndex === battleState.currentPlayerIndex);
 

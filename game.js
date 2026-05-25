@@ -1925,11 +1925,8 @@
     const player = next.players[next.currentPlayerIndex];
     if (!player) return syncDrawWallState(next);
 
-    if (player.isRiichi && player.isCpu) {
-      return syncDrawWallState(next);
-    }
     if (player.isRiichi) {
-      return handleRiichiDraw(player, next);
+      return syncDrawWallState(next);
     }
     if (player.isCpu) {
       if (canTsumo(player, next)) {

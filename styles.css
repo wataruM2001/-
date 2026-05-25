@@ -847,12 +847,16 @@ button {
 }
 
 .paifu-controls .paifu-nav-button {
-  min-width: auto;
+  width: auto;
+  min-width: max-content;
   min-height: 28px;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 12px;
   font-size: 12px;
   line-height: 1;
+  writing-mode: horizontal-tb;
+  white-space: nowrap;
+  word-break: keep-all;
   border-radius: 999px;
   box-shadow:
     0 0 7px rgba(243, 216, 142, 0.18),
@@ -890,10 +894,15 @@ button {
   }
 
   .paifu-controls .paifu-nav-button {
+    width: auto;
+    min-width: max-content;
     min-height: 26px;
     height: 26px;
     padding: 0 8px;
     font-size: 11px;
+    writing-mode: horizontal-tb;
+    white-space: nowrap;
+    word-break: keep-all;
   }
 
   .paifu-hand-select-label {
@@ -3049,6 +3058,7 @@ body {
 
 .battle-start-button,
 #battleConfirmButton,
+#battlePaifuButton,
 #battleRestartButton,
 #recordButton,
 .battle-action-button[data-battle-action="ron"],
