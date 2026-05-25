@@ -3382,9 +3382,9 @@ button:disabled:hover,
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .dora-indicator-row {
-    position: fixed;
+    position: absolute;
     left: 50%;
-    top: 10px;
+    top: calc(10px - var(--center-layout-top) + var(--center-layout-upshift) - var(--center-layout-downshift));
     width: auto;
     min-width: calc(var(--landscape-tile-width) * 5);
     height: var(--dora-tile-height);
