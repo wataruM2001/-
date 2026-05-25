@@ -1384,7 +1384,32 @@
     return `<img class="result-tile-img ${modifier}" src="${escapeHtml(tile.image)}" alt="${escapeHtml(label)}" loading="lazy" />`;
   }
 
+  function renderResultBackTile() {
+    return `<img class="result-tile-img result-back-tile" src="${escapeHtml(Tiles.tileImagePath("blue_back"))}" alt="背面牌" loading="lazy" />`;
+  }
+
+  function renderFiveResultIndicatorSlots(indicators = [], shouldReveal = true) {
+    return Array.from({ length: 5 }, (_, index) => {
+      const tile = indicators?.[index];
+      return shouldReveal && tile ? renderResultTile(tile) : renderResultBackTile();
+    }).join("");
+  }
+
+  function renderResultDoraIndicatorRow(win, result) {
+    if (win.isNagashiYakuman) return "";
+    const doraIndicators = win.doraIndicators || result.doraIndicators || [];
+    const uraDoraIndicators = win.uraDoraIndicators || result.uraDoraIndicators || [];
+    return `
+      <div class="result-dora-row" aria-label="ドラ表示牌と裏ドラ表示牌">
+        <div class="result-dora-group">${renderFiveResultIndicatorSlots(doraIndicators, true)}</div>
+        <div class="result-dora-spacer" aria-hidden="true"></div>
+        <div class="result-dora-group">${renderFiveResultIndicatorSlots(uraDoraIndicators, Boolean(win.isRiichi))}</div>
+      </div>
+    `;
+  }
+
   function renderResultTileRow(label, tiles = []) {
+    if (label === "ドラ表示牌" || label === "裏ドラ表示牌") return "";
     if (!tiles.length) return "";
     return `
       <div class="result-detail-row">
@@ -1476,6 +1501,7 @@
             (win) => `
               <article class="result-win-detail">
                 ${wins.length > 1 ? `<strong>${escapeHtml(win.title)}</strong>` : ""}
+                ${renderResultDoraIndicatorRow(win, result)}
                 ${win.isNagashiYakuman ? "" : renderResultTileRow("ドラ表示牌", win.doraIndicators || result.doraIndicators || [])}
                 ${win.isRiichi ? renderResultTileRow("裏ドラ表示牌", win.uraDoraIndicators || result.uraDoraIndicators || []) : ""}
                 <div class="result-detail-text">${escapeHtml(win.yakuText)}</div>
