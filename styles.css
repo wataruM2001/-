@@ -822,10 +822,17 @@ button {
 .result-dora-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0;
-  margin: 4px 0 6px;
+  justify-content: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0;
   min-width: 0;
+}
+
+.result-dora-label {
+  color: var(--ui-gold, #f3d88e);
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .result-dora-group {
@@ -835,8 +842,8 @@ button {
 }
 
 .result-dora-spacer {
-  width: 28px;
-  flex: 0 0 28px;
+  width: 24px;
+  flex: 0 0 24px;
 }
 
 .result-dora-row .result-tile-img {
