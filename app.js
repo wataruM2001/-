@@ -341,7 +341,9 @@
       renderBattleScreenPanels();
     });
     els.battleRestartButton?.addEventListener("click", () => {
-      startBattleHanchan();
+      settlementBreakdownVisible = false;
+      appScreen = "start";
+      renderBattleTable();
     });
     els.battlePaifuButton?.addEventListener("click", () => {
       openPaifuScreen();
@@ -2848,20 +2850,28 @@
     }
     if (els.battlePaifuButton) {
       const hasReplay = hasPaifuSnapshots();
+      els.battlePaifuButton.textContent = "牌譜参照";
       els.battlePaifuButton.disabled = !hasReplay;
       els.battlePaifuButton.title = hasReplay ? "" : "牌譜データがありません";
       setHiddenIfChanged(els.battlePaifuButton, false);
     }
-    if (els.battleSharePaifuButton) {
-      const hasReplay = hasPaifuSnapshots();
-      els.battleSharePaifuButton.disabled = !hasReplay;
-      els.battleSharePaifuButton.title = hasReplay ? "" : "牌譜データがありません";
-      setHiddenIfChanged(els.battleSharePaifuButton, false);
+    if (els.battleRestartButton) {
+      els.battleRestartButton.textContent = "終了";
+      els.battleRestartButton.disabled = false;
+      els.battleRestartButton.title = "";
+      setHiddenIfChanged(els.battleRestartButton, false);
     }
-    const existingSharedUrl = paifuReplay?.sharedUrl || (paifuReplay?.shareId && window.paifuShareApi?.buildShareUrl?.(paifuReplay.shareId)) || "";
-    updateSharedPaifuUrlUi(existingSharedUrl);
-    if (existingSharedUrl && els.battleSharePaifuStatus && !els.battleSharePaifuStatus.textContent) {
-      showBattleShareStatus(`作成済み: ${existingSharedUrl}`);
+    if (els.battleSharePaifuButton) {
+      setHiddenIfChanged(els.battleSharePaifuButton, true);
+      els.battleSharePaifuButton.disabled = true;
+    }
+    if (els.battleCopyPaifuUrlButton) {
+      setHiddenIfChanged(els.battleCopyPaifuUrlButton, true);
+      els.battleCopyPaifuUrlButton.disabled = true;
+    }
+    if (els.battleSharePaifuStatus) {
+      els.battleSharePaifuStatus.textContent = "";
+      setHiddenIfChanged(els.battleSharePaifuStatus, true);
     }
   }
 
