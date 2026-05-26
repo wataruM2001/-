@@ -3409,14 +3409,14 @@
   }
 
   function formatDisplayPoints(points) {
-    return String(Math.round(Number(points) || 0));
+    return String(Math.round((Number(points) || 0) / 100));
   }
 
   function formatDisplayChipPoints(chipPoints) {
     const value = Math.round((Number(chipPoints) || 0) / 500);
-    if (value > 0) return `+${value}pt`;
-    if (value < 0) return `${value}pt`;
-    return "0pt";
+    if (value > 0) return `+${value}`;
+    if (value < 0) return `${value}`;
+    return "0";
   }
 
   function formatScoreDisplay(wind, points, chipPoints) {
@@ -4473,34 +4473,88 @@
     return [...(player?.discards || [])];
   }
 
-  function riverTileStyleForSeat(seat, index) {
+  function isRiichiDiscardMarker(discard) {
+    return Boolean(discard?.isRiichiDeclaration || discard?.isRiichiMarkerReplacement);
+  }
+
+  function countRiichiMarkers(discards) {
+    return discards.reduce(
+      (counts, discard) => {
+        if (isRiichiDiscardMarker(discard)) {
+          counts.riichi += 1;
+        } else {
+          counts.normal += 1;
+        }
+        return counts;
+      },
+      { normal: 0, riichi: 0 }
+    );
+  }
+
+  function riverStretchGapCss(axis, discards) {
+    if (discards.length <= 1) return "0px";
+    const counts = countRiichiMarkers(discards);
+    const panelSizeVar = axis === "x" ? "--center-panel-width" : "--center-panel-height";
+    return `max(0px, calc((var(${panelSizeVar}) - (${counts.normal} * var(--river-tile-width)) - (${counts.riichi} * var(--river-tile-long))) / ${discards.length - 1}))`;
+  }
+
+  function riverPositionStyle(left, top) {
+    return `style="--river-tile-left:${left};--river-tile-top:${top};"`;
+  }
+
+  function riverTileStyleForSeat(seat, index, discards = []) {
+    const groupIndex = Math.floor(index / 6);
+    const itemIndex = index % 6;
+    const groupDiscards = discards.slice(groupIndex * 6, groupIndex * 6 + 6);
+    const hasRiichiInGroup = groupDiscards.some(isRiichiDiscardMarker);
+
     if (seat === "self") {
-      const row = Math.floor(index / 6) + 1;
-      const column = (index % 6) + 1;
-      return `style="grid-row:${row};grid-column:${column};"`;
+      const top = `calc(${groupIndex} * var(--river-tile-long))`;
+      if (!hasRiichiInGroup) {
+        return riverPositionStyle(`calc(${itemIndex} * var(--river-tile-width))`, top);
+      }
+      const beforeCounts = countRiichiMarkers(groupDiscards.slice(0, itemIndex));
+      const gap = riverStretchGapCss("x", groupDiscards);
+      const left = `calc((${beforeCounts.normal} * var(--river-tile-width)) + (${beforeCounts.riichi} * var(--river-tile-long)) + (${itemIndex} * ${gap}))`;
+      return riverPositionStyle(left, top);
     }
+
     if (seat === "shimocha") {
-      const row = 6 - (index % 6);
-      const column = Math.floor(index / 6) + 1;
-      return `style="grid-row:${row};grid-column:${column};"`;
+      const left = `calc(${groupIndex} * var(--river-tile-long))`;
+      if (!hasRiichiInGroup) {
+        return riverPositionStyle(left, `calc(var(--center-panel-height) - ((${itemIndex} + 1) * var(--river-tile-width)))`);
+      }
+      const throughCounts = countRiichiMarkers(groupDiscards.slice(0, itemIndex + 1));
+      const gap = riverStretchGapCss("y", groupDiscards);
+      const top = `calc(var(--center-panel-height) - ((${throughCounts.normal} * var(--river-tile-width)) + (${throughCounts.riichi} * var(--river-tile-long)) + (${itemIndex} * ${gap})))`;
+      return riverPositionStyle(left, top);
     }
+
     if (seat === "kamicha") {
-      const row = (index % 6) + 1;
-      const column = 4 - Math.floor(index / 6);
-      return `style="grid-row:${row};grid-column:${column};"`;
+      const left = `calc(var(--side-river-width) - ((${groupIndex} + 1) * var(--river-tile-long)))`;
+      if (!hasRiichiInGroup) {
+        return riverPositionStyle(left, `calc(${itemIndex} * var(--river-tile-width))`);
+      }
+      const beforeCounts = countRiichiMarkers(groupDiscards.slice(0, itemIndex));
+      const gap = riverStretchGapCss("y", groupDiscards);
+      const top = `calc((${beforeCounts.normal} * var(--river-tile-width)) + (${beforeCounts.riichi} * var(--river-tile-long)) + (${itemIndex} * ${gap}))`;
+      return riverPositionStyle(left, top);
     }
+
     return "";
   }
 
   function renderDiscardRiver(player) {
     const rotationClass = tileRotationClassForSeat(player?.seat);
-    return orderDiscardsForRiver(player)
+    const discards = orderDiscardsForRiver(player);
+    return discards
       .map((discard, index) => {
         const tile = discardTileOf(discard);
         if (!tile) return "";
-        const isRiichiMarker = Boolean(discard?.isRiichiDeclaration || discard?.isRiichiMarkerReplacement);
+        const isRiichiMarker = isRiichiDiscardMarker(discard);
         const classes = [
           "river-tile",
+          "river-tile-positioned",
           rotationClass,
           discard?.isTsumogiri ? "tsumogiri" : "",
           isRiichiMarker ? "riichi-discard" : "",
@@ -4508,7 +4562,7 @@
         ]
           .filter(Boolean)
           .join(" ");
-        return renderBattleTile(tile, classes, false, riverTileStyleForSeat(player?.seat, index));
+        return renderBattleTile(tile, classes, false, riverTileStyleForSeat(player?.seat, index, discards));
       })
       .join("");
   }
