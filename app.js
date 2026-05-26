@@ -3061,20 +3061,19 @@
   }
 
   function renderRankingTable(rows = []) {
-    const metric = STATS_RANKING_METRICS[statsRankingKind] || STATS_RANKING_METRICS.average_settlement_point;
     const rankedRows = sortedRankingRows(rows, statsRankingKind);
+    const metricOrder = Object.keys(STATS_RANKING_METRICS);
+    const selectedMetricKey = STATS_RANKING_METRICS[statsRankingKind] ? statsRankingKind : "average_settlement_point";
+    const rankingColumns = [
+      selectedMetricKey,
+      ...metricOrder.filter((metricKey) => metricKey !== selectedMetricKey),
+    ];
     const header = `
       <thead>
         <tr>
           <th>\u9806\u4f4d</th>
           <th>\u30e6\u30fc\u30b6\u30fc\u540d</th>
-          <th class="ranking-type-value-header">\u7a2e\u5225: ${escapeHtml(metric.label)}</th>
-          <th>\u534a\u8358\u6570</th>
-          <th>\u5e73\u5747\u53ce\u652f</th>
-          <th>\u5e73\u5747\u7740\u9806</th>
-          <th>\u5e73\u5747\u7d20\u70b9</th>
-          <th>\u5e73\u5747\u795d\u5100</th>
-          <th>\u548c\u4e86\u7387</th>
+          ${rankingColumns.map((metricKey) => `<th>${escapeHtml(STATS_RANKING_METRICS[metricKey].label)}</th>`).join("")}
         </tr>
       </thead>
     `;
@@ -3082,7 +3081,7 @@
       return `
         <table class="stats-table stats-ranking-table">
           ${header}
-          <tbody><tr><td colspan="9">\u30e9\u30f3\u30ad\u30f3\u30b0\u30c7\u30fc\u30bf\u306f\u307e\u3060\u3042\u308a\u307e\u305b\u3093</td></tr></tbody>
+          <tbody><tr><td colspan="${rankingColumns.length + 2}">\u30e9\u30f3\u30ad\u30f3\u30b0\u30c7\u30fc\u30bf\u306f\u307e\u3060\u3042\u308a\u307e\u305b\u3093</td></tr></tbody>
         </table>
       `;
     }
@@ -3094,13 +3093,7 @@
             <tr>
               <td>${index + 1}</td>
               <td>${escapeHtml(row.display_name || "\u533f\u540d\u30e6\u30fc\u30b6\u30fc")}</td>
-              <td class="ranking-type-value-cell">${escapeHtml(formatRankingValue(row, statsRankingKind))}</td>
-              <td>${formatPlainNumber(row.hanchan_count)}</td>
-              <td>${formatSignedNumber(row.average_settlement_point)}</td>
-              <td>${Number(row.average_rank || 0).toFixed(2)}</td>
-              <td>${formatPlainNumber(row.average_final_raw_score)}</td>
-              <td>${formatSignedNumber(rankingMetricRawValue(row, "average_chip_count"), 1)}</td>
-              <td>${formatPercent(row.win_rate)}</td>
+              ${rankingColumns.map((metricKey) => `<td>${escapeHtml(formatRankingValue(row, metricKey))}</td>`).join("")}
             </tr>
           `).join("")}
         </tbody>
@@ -4450,7 +4443,7 @@
           .map((tile, index) => {
             if (meld.type === "kakan" && index === calledIndex && meld.addedTile) {
               return `
-                <span class="meld-tile-slot is-horizontal is-kakan">
+                <span class="meld-tile-slot is-horizontal is-kakan-stack">
                   <span class="called-tile-stack">
                     ${renderMeldTileImage(tile, "called-tile")}
                     ${renderMeldTileImage(meld.addedTile, "called-tile added-kan-tile")}
