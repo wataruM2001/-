@@ -1952,6 +1952,14 @@ button {
   justify-content: flex-start;
 }
 
+.river-column.has-riichi-discard {
+  justify-content: space-between;
+}
+
+.river-column.no-riichi-discard {
+  row-gap: 0;
+}
+
 .river-tile-slot {
   position: relative;
   display: grid;
