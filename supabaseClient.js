@@ -8,6 +8,7 @@
     publishableKey: "sb_publishable_4BIoZK2R5RvVzjgzHp-m4g_tZcuKaUZ",
     sharedPaifusTable: "shared_paifus",
     hanchanStatsTable: "hanchan_stats",
+    profilesTable: "profiles",
     shareUrlBase: "https://watarum2001.github.io/marchao-sanma/",
   });
 
@@ -107,6 +108,48 @@
     const url = new URL(supabaseConfig.shareUrlBase);
     url.searchParams.set("paifu", shareId);
     return url.toString();
+  }
+
+  async function getCurrentSupabaseUser() {
+    const client = getSupabaseClient();
+    if (!client) return unavailableResult("getCurrentSupabaseUser");
+    const { data, error } = await client.auth.getUser();
+    if (error) return { ok: false, error, reason: error.message || "ユーザー情報を取得できませんでした" };
+    return { ok: true, user: data?.user || null };
+  }
+
+  async function getCurrentSupabaseUserId() {
+    const result = await getCurrentSupabaseUser();
+    if (!result.ok) return null;
+    return result.user?.id || null;
+  }
+
+  async function ensureUserProfile() {
+    const client = getSupabaseClient();
+    if (!client) return unavailableResult("ensureUserProfile");
+    const userResult = await getCurrentSupabaseUser();
+    if (!userResult.ok) return userResult;
+    const user = userResult.user;
+    if (!user?.id) return { ok: false, skipped: true, reason: "ログインするとランキングに成績を保存できます" };
+
+    const { data: existing, error: selectError } = await client
+      .from(supabaseConfig.profilesTable)
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (selectError) return { ok: false, error: selectError, reason: selectError.message || "プロフィールを確認できませんでした" };
+    if (existing) return { ok: true, userId: user.id, existed: true };
+
+    const { error: insertError } = await client
+      .from(supabaseConfig.profilesTable)
+      .insert({
+        user_id: user.id,
+        display_name: `User ${String(user.id).slice(0, 4)}`,
+      });
+    if (insertError && insertError.code !== "23505") {
+      return { ok: false, error: insertError, reason: insertError.message || "プロフィールを作成できませんでした" };
+    }
+    return { ok: true, userId: user.id, created: !insertError };
   }
 
   function normalizeShareRow({ shareId, title, paifu, settlement, isPublic, rulesVersion, appVersion }) {
@@ -222,22 +265,37 @@
 
   const statsApi = {
     isConfigured,
+    getCurrentSupabaseUserId,
 
     async saveHanchanStats(rows) {
       const client = getSupabaseClient();
       if (!client) return unavailableResult("saveHanchanStats");
+      const userResult = await getCurrentSupabaseUser();
+      if (!userResult.ok) return userResult;
+      const userId = userResult.user?.id || null;
+      if (!userId) {
+        return { ok: true, skipped: true, reason: "ログインするとランキングに成績を保存できます" };
+      }
+      const profileResult = await ensureUserProfile();
+      if (!profileResult.ok && !profileResult.skipped) return profileResult;
 
-      const statsRows = Array.isArray(rows) ? rows : [rows].filter(Boolean);
+      const statsRows = (Array.isArray(rows) ? rows : [rows]).filter(Boolean).map((row) => ({
+        ...cloneJson(row),
+        user_id: userId,
+      }));
       if (!statsRows.length) {
         return { ok: false, reason: "保存する成績がありません" };
       }
 
       const { data, error } = await client
         .from(supabaseConfig.hanchanStatsTable)
-        .insert(cloneJson(statsRows))
-        .select("hanchan_id,rank,settlement_point,chip_count,total_hands,win_count,deal_in_count");
+        .insert(statsRows)
+        .select("user_id,hanchan_id,ended_at,rank,final_raw_score,settlement_point,chip_count,total_hands,win_count,deal_in_count,riichi_count,called_hand_count,duration_seconds");
 
       if (error) {
+        if (error.code === "23505") {
+          return { ok: true, duplicate: true, reason: "この半荘成績は保存済みです" };
+        }
         return { ok: false, error, reason: error.message || "半荘成績の保存に失敗しました" };
       }
 
@@ -247,6 +305,9 @@
 
   const authApi = {
     isConfigured,
+    getCurrentSupabaseUser,
+    getCurrentSupabaseUserId,
+    ensureUserProfile,
 
     async getSession() {
       const client = getSupabaseClient();
@@ -257,11 +318,7 @@
     },
 
     async getUser() {
-      const client = getSupabaseClient();
-      if (!client) return unavailableResult("getUser");
-      const { data, error } = await client.auth.getUser();
-      if (error) return { ok: false, error, reason: error.message || "ユーザー情報を取得できませんでした" };
-      return { ok: true, user: data?.user || null };
+      return getCurrentSupabaseUser();
     },
 
     async signInWithEmail(email) {
