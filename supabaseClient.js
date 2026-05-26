@@ -202,6 +202,50 @@
     return { ok: true, userId: user.id, created: !insertError };
   }
 
+  async function getUserProfile(userInput = null) {
+    const client = getSupabaseClient();
+    if (!client) return unavailableResult("getUserProfile");
+    let user = userInput;
+    if (!user?.id) {
+      const userResult = await ensureSupabaseUser();
+      if (!userResult.ok) return userResult;
+      user = userResult.user;
+    }
+    if (!user?.id) return { ok: false, skipped: true, reason: "Supabase user unavailable." };
+    const ensured = await ensureUserProfile(user);
+    if (!ensured.ok && !ensured.skipped) return ensured;
+    const { data, error } = await client
+      .from(supabaseConfig.profilesTable)
+      .select("user_id,display_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (error) return { ok: false, error, reason: error.message || "Profile could not be loaded." };
+    return { ok: true, data, user };
+  }
+
+  async function updateProfileDisplayName(displayName) {
+    const client = getSupabaseClient();
+    if (!client) return unavailableResult("updateProfileDisplayName");
+    const name = String(displayName || "").trim();
+    if (!name) return { ok: false, reason: "ユーザー名を入力してください" };
+    if ([...name].length > 8) return { ok: false, reason: "ユーザー名は8文字以内にしてください" };
+    const userResult = await ensureSupabaseUser();
+    if (!userResult.ok) return userResult;
+    const user = userResult.user;
+    if (!user?.id) return { ok: false, skipped: true, reason: "Supabase user unavailable." };
+    const { data, error } = await client
+      .from(supabaseConfig.profilesTable)
+      .upsert({
+        user_id: user.id,
+        display_name: name,
+      })
+      .select("user_id,display_name")
+      .single();
+    if (error) return { ok: false, error, reason: error.message || "ユーザー名の保存に失敗しました" };
+    return { ok: true, data, user };
+  }
+
+
   function normalizeShareRow({ shareId, title, paifu, settlement, isPublic, rulesVersion, appVersion }) {
     const normalizedShareId = shareId || createShareId();
     const sharedUrl = buildPaifuShareUrl(normalizedShareId);
@@ -352,7 +396,7 @@
 
       const { data, error } = await client
         .from("hanchan_ranking_summary")
-        .select("display_name,hanchan_count,total_settlement_point,average_settlement_point,average_rank,total_chip_count,total_hands,round_profit,win_rate,deal_in_rate,riichi_rate,called_rate,average_duration_seconds")
+        .select("display_name,hanchan_count,total_settlement_point,average_settlement_point,average_rank,average_final_raw_score,total_chip_count,total_hands,round_profit,win_rate,deal_in_rate,riichi_rate,called_rate,average_duration_seconds")
         .order("total_settlement_point", { ascending: false })
         .limit(safeLimit);
 
@@ -402,6 +446,8 @@
     getCurrentSupabaseUserId,
     ensureSupabaseUser,
     ensureUserProfile,
+    getUserProfile,
+    updateProfileDisplayName,
 
     async getSession() {
       const client = getSupabaseClient();
