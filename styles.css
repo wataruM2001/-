@@ -2768,6 +2768,10 @@ input[type="checkbox"] {
   text-align: center;
 }
 
+.round-info-landscape {
+  display: none;
+}
+
 .center-table-layout #battleRemainingDraws {
   display: none;
 }
@@ -3339,6 +3343,29 @@ button:disabled:hover,
     overflow: hidden;
   }
 
+  .battle-surface.is-start-screen {
+    --start-landscape-button-width: clamp(220px, 26vw, 280px);
+  }
+
+  .battle-surface.is-start-screen .self-hand-area {
+    transform: translate(calc(-50% - (var(--start-landscape-button-width) * 0.5)), -50%);
+    max-width: calc(100vw - 16px);
+  }
+
+  .battle-surface.is-start-screen .battle-control-row {
+    gap: clamp(10px, 2vh, 16px);
+  }
+
+  .battle-surface.is-start-screen .start-menu-button {
+    min-width: var(--start-landscape-button-width);
+    min-height: clamp(46px, 12vh, 58px);
+    padding: 0 clamp(22px, 3vw, 34px);
+    font-size: clamp(1rem, 4.2vh, 1.28rem);
+    writing-mode: horizontal-tb;
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) {
     --center-layout-gap: 1px;
     --center-river-tile-width: clamp(17px, 4.35vh, 22px);
@@ -3346,7 +3373,7 @@ button:disabled:hover,
     --self-hand-landscape-tile-width: calc(var(--landscape-tile-width) * 1.5);
     --center-river-tile-long: calc(var(--center-river-tile-width) * 1.40625);
     --side-river-width: calc(4 * var(--center-river-tile-long));
-    --center-panel-width: calc(6 * var(--center-river-tile-width));
+    --center-panel-width: clamp(220px, 29vw, 270px);
     --center-panel-base-height: calc(7.15 * var(--center-river-tile-width));
     --center-panel-text-lift: calc(var(--center-river-tile-long) * 0.8);
     --center-panel-height: calc(var(--center-panel-base-height) - var(--center-panel-text-lift));
@@ -3363,7 +3390,8 @@ button:disabled:hover,
     --open-tile-height: calc(var(--open-tile-width) * 1.40625);
     --dora-tile-width: var(--landscape-tile-width);
     --dora-tile-height: calc(var(--landscape-tile-width) * 1.40625);
-    --landscape-side-margin: clamp(40px, calc(var(--hand-tile-width) * 5), 180px);
+    --landscape-side-margin-base: clamp(40px, calc(var(--hand-tile-width) * 5), 180px);
+    --landscape-side-margin: max(0px, calc(var(--landscape-side-margin-base) - var(--center-river-tile-long)));
     --meld-group-gap: 5px;
     --meld-tile-gap: 1px;
     --battle-effect-font-size: clamp(42px, 11vh, 58px);
@@ -3398,24 +3426,39 @@ button:disabled:hover,
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .round-title-block {
-    top: calc((var(--center-panel-base-height) / 2) + 10px - var(--center-panel-text-lift));
-    width: calc(var(--center-river-tile-width) * 3.2);
+    top: calc((var(--center-panel-base-height) / 2) + 20px - var(--center-panel-text-lift));
+    width: calc(var(--center-panel-width) - 12px);
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) #battleRoundLabel {
+    display: none;
     font-size: clamp(14px, 3.9vh, 18px);
     line-height: 0.92;
     white-space: nowrap;
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) #battleHonbaKyotakuLabel {
+    display: none;
     margin-top: 2px;
     font-size: clamp(8px, 2.2vh, 10px);
     white-space: nowrap;
   }
 
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .round-info-landscape {
+    display: grid;
+    gap: 0;
+    justify-items: center;
+    width: 100%;
+    color: #f3d88e;
+    font-size: clamp(22px, calc(3.9vh + 10px), 28px);
+    font-weight: 900;
+    line-height: 0.92;
+    text-align: center;
+    white-space: nowrap;
+  }
+
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .center-score-display .score-display {
-    font-size: clamp(10px, 3vh, 14px);
+    font-size: clamp(20px, calc(3vh + 10px), 24px);
     white-space: nowrap;
   }
 

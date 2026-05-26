@@ -149,6 +149,7 @@
     battleRightName: document.getElementById("battleRightName"),
     battleRoundLabel: document.getElementById("battleRoundLabel"),
     battleHonbaKyotakuLabel: document.getElementById("battleHonbaKyotakuLabel"),
+    battleLandscapeRoundInfo: document.getElementById("battleLandscapeRoundInfo"),
     battleRemainingDraws: document.getElementById("battleRemainingDraws"),
     battleDealerLabel: document.getElementById("battleDealerLabel"),
     battleKyotakuLabel: document.getElementById("battleKyotakuLabel"),
@@ -1976,10 +1977,17 @@
     const kyotakuCount = Math.max(0, Math.floor(Number(gameState.kyotaku) || 0));
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     const dealerPlayer = gameState.players[gameState.dealerIndex];
+    const roundLabel = `${windText(gameState.roundWind)}${gameState.handNumber}局`;
 
-    setTextIfChanged(els.battleRoundLabel, `${windText(gameState.roundWind)}${gameState.handNumber}局`);
+    setTextIfChanged(els.battleRoundLabel, roundLabel);
     if (els.battleHonbaKyotakuLabel) {
       setTextIfChanged(els.battleHonbaKyotakuLabel, `${gameState.honba}本場 供託${kyotakuCount} 残${gameState.remainingDraws}`);
+    }
+    if (els.battleLandscapeRoundInfo) {
+      setHtmlIfChanged(
+        els.battleLandscapeRoundInfo,
+        `<span class="round-info-line">${escapeHtml(`${roundLabel}${gameState.honba}本場 供託${kyotakuCount}`)}</span><span class="round-info-line">残${escapeHtml(String(gameState.remainingDraws))}</span>`
+      );
     }
     setTextIfChanged(els.battleRemainingDraws, `残 ${gameState.remainingDraws}`);
     setTextIfChanged(els.battleDealerLabel, `親 ${playerPositionLabel(dealerPlayer?.seat)}`);
@@ -3067,6 +3075,12 @@
     setTextIfChanged(els.battleRoundLabel, Rules.roundLabel(state));
     if (els.battleHonbaKyotakuLabel) {
       setTextIfChanged(els.battleHonbaKyotakuLabel, `${state.honba || 0}本場 供託${kyotakuCount} 残--`);
+    }
+    if (els.battleLandscapeRoundInfo) {
+      setHtmlIfChanged(
+        els.battleLandscapeRoundInfo,
+        `<span class="round-info-line">${escapeHtml(`${Rules.roundLabel(state)}${state.honba || 0}本場 供託${kyotakuCount}`)}</span><span class="round-info-line">残--</span>`
+      );
     }
     setTextIfChanged(els.battleRemainingDraws, "残りツモ --");
     setTextIfChanged(els.battleDealerLabel, `親 ${displayPlayerNameByIndex(dealer)}`);
