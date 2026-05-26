@@ -19,6 +19,19 @@
   const STATS_STORAGE_KEY = "marchaoSanmaStatsV1";
   const IN_PROGRESS_STORAGE_KEY = "marchaoSanmaInProgressV1";
   const STATS_HISTORY_PAGE_SIZE = 10;
+  const STATS_RANKING_LIMIT = 10;
+  const STATS_RANKING_METRICS = {
+    total_settlement_point: { label: "合計収支", format: "signed", direction: "desc" },
+    average_settlement_point: { label: "平均収支", format: "signed", direction: "desc" },
+    average_rank: { label: "平均着順", format: "rank", direction: "asc" },
+    total_chip_count: { label: "合計祝儀", format: "signed", direction: "desc" },
+    win_rate: { label: "和了率", format: "percent", direction: "desc" },
+    deal_in_rate: { label: "放銃率", format: "percent", direction: "asc" },
+    riichi_rate: { label: "立直率", format: "percent", direction: "desc" },
+    called_rate: { label: "副露率", format: "percent", direction: "desc" },
+    round_profit: { label: "局収支", format: "signed", direction: "desc" },
+    average_duration_seconds: { label: "平均時間", format: "duration", direction: "asc" },
+  };
   const APP_VERSION = "shared-paifu-url-v1";
   const RULES_VERSION = "marchao-sanma-v1";
   const RESULT_YAKU_NAME_MAP = {
@@ -113,6 +126,7 @@
   let statsDataSourceStatusText = "表示中：端末内成績";
   let statsRankingRows = [];
   let statsRankingStatusText = "読み込み前";
+  let statsRankingKind = "total_settlement_point";
   let statsOnlineLoadToken = 0;
   let isViewingSharedPaifu = false;
   let currentSharedPaifuUrl = "";
@@ -180,6 +194,7 @@
     statsSupabaseStatus: document.getElementById("statsSupabaseStatus"),
     statsSupabaseTable: document.getElementById("statsSupabaseTable"),
     statsRankingStatus: document.getElementById("statsRankingStatus"),
+    statsRankingKindSelect: document.getElementById("statsRankingKindSelect"),
     statsRankingTable: document.getElementById("statsRankingTable"),
     statsPrevPageButton: document.getElementById("statsPrevPageButton"),
     statsNextPageButton: document.getElementById("statsNextPageButton"),
@@ -753,6 +768,12 @@
       const month = Number(els.statsMonthSelect.value);
       if (Number.isFinite(month)) {
         statsSelectedMonth = clampNumber(Math.floor(month), 1, 12);
+      }
+      renderStatsScreen();
+    });
+    els.statsRankingKindSelect?.addEventListener("change", () => {
+      if (STATS_RANKING_METRICS[els.statsRankingKindSelect.value]) {
+        statsRankingKind = els.statsRankingKindSelect.value;
       }
       renderStatsScreen();
     });
@@ -2905,7 +2926,7 @@
 
     const [ownResult, rankingResult] = await Promise.allSettled([
       window.statsApi.loadOwnHanchanStats?.(),
-      window.statsApi.loadRankingSummary?.(50),
+      window.statsApi.loadRankingSummary?.(500),
     ]);
     if (token !== statsOnlineLoadToken) return;
 
@@ -2974,24 +2995,60 @@
               <td>${escapeHtml(`${record.rank}位`)}</td>
               <td>${formatPlainNumber(record.finalRawScore)}</td>
               <td>${formatSignedNumber(record.settlementPoint)}</td>
-              <td>${formatSignedNumber(record.chipCount)}</td>
-              <td>${formatPlainNumber(record.totalHands)}</td>
-            </tr>
-          `).join("")}
+      <td>${formatSignedNumber(record.chipCount)}</td>
+      <td>${formatPlainNumber(record.totalHands)}</td>
+    </tr>
+  `).join("")}
         </tbody>
       </table>
     `;
   }
 
+  function normalizeRankingNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function rankingMetricValue(row, metricKey = statsRankingKind) {
+    return normalizeRankingNumber(row?.[metricKey], metricKey === "average_duration_seconds" ? Number.POSITIVE_INFINITY : 0);
+  }
+
+  function formatRankingValue(row, metricKey = statsRankingKind) {
+    const metric = STATS_RANKING_METRICS[metricKey] || STATS_RANKING_METRICS.total_settlement_point;
+    const value = row?.[metricKey];
+    if (metric.format === "duration") return formatDuration(value);
+    if (metric.format === "percent") return formatPercent(value);
+    if (metric.format === "rank") return Number(value || 0).toFixed(2);
+    return formatSignedNumber(value);
+  }
+
+  function sortedRankingRows(rows = [], metricKey = statsRankingKind) {
+    const metric = STATS_RANKING_METRICS[metricKey] || STATS_RANKING_METRICS.total_settlement_point;
+    const direction = metric.direction === "asc" ? 1 : -1;
+    return [...rows]
+      .filter((row) => normalizeRankingNumber(row?.hanchan_count) > 0)
+      .sort((left, right) => {
+        const diff = rankingMetricValue(left, metricKey) - rankingMetricValue(right, metricKey);
+        if (diff !== 0) return diff * direction;
+        const settlementDiff = normalizeRankingNumber(right?.total_settlement_point) - normalizeRankingNumber(left?.total_settlement_point);
+        if (settlementDiff !== 0) return settlementDiff;
+        return normalizeRankingNumber(right?.hanchan_count) - normalizeRankingNumber(left?.hanchan_count);
+      })
+      .slice(0, STATS_RANKING_LIMIT);
+  }
+
   function renderRankingTable(rows = []) {
-    if (!rows.length) {
+    const metric = STATS_RANKING_METRICS[statsRankingKind] || STATS_RANKING_METRICS.total_settlement_point;
+    const rankedRows = sortedRankingRows(rows, statsRankingKind);
+    if (!rankedRows.length) {
       return `
         <table class="stats-table stats-ranking-table">
           <thead>
             <tr>
               <th>順位</th>
-              <th>名前</th>
+              <th>ユーザー名</th>
               <th>半荘数</th>
+              <th>値</th>
               <th>合計収支</th>
               <th>平均収支</th>
               <th>平均着順</th>
@@ -3000,7 +3057,7 @@
               <th>放銃率</th>
             </tr>
           </thead>
-          <tbody><tr><td colspan="9">ランキングデータはまだありません</td></tr></tbody>
+          <tbody><tr><td colspan="10">ランキングデータはまだありません</td></tr></tbody>
         </table>
       `;
     }
@@ -3009,8 +3066,9 @@
         <thead>
           <tr>
             <th>順位</th>
-            <th>名前</th>
+            <th>ユーザー名</th>
             <th>半荘数</th>
+            <th>値: ${escapeHtml(metric.label)}</th>
             <th>合計収支</th>
             <th>平均収支</th>
             <th>平均着順</th>
@@ -3020,11 +3078,12 @@
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row, index) => `
+          ${rankedRows.map((row, index) => `
             <tr>
               <td>${index + 1}</td>
               <td>${escapeHtml(row.display_name || "匿名ユーザー")}</td>
               <td>${formatPlainNumber(row.hanchan_count)}</td>
+              <td>${escapeHtml(formatRankingValue(row, statsRankingKind))}</td>
               <td>${formatSignedNumber(row.total_settlement_point)}</td>
               <td>${formatSignedNumber(row.average_settlement_point)}</td>
               <td>${Number(row.average_rank || 0).toFixed(2)}</td>
@@ -3066,6 +3125,20 @@
     return "まだ成績がありません。\n半荘を1回終了すると、ここに成績が記録されます。";
   }
 
+  function renderStatsRankingControls() {
+    if (!els.statsRankingKindSelect) return;
+    const options = Object.entries(STATS_RANKING_METRICS)
+      .map(([key, metric]) => `<option value="${escapeHtml(key)}">${escapeHtml(metric.label)}ランキング</option>`)
+      .join("");
+    setHtmlIfChanged(els.statsRankingKindSelect, options);
+    if (!STATS_RANKING_METRICS[statsRankingKind]) {
+      statsRankingKind = "total_settlement_point";
+    }
+    if (els.statsRankingKindSelect.value !== statsRankingKind) {
+      els.statsRankingKindSelect.value = statsRankingKind;
+    }
+  }
+
   function renderStatsScreen() {
     const storage = loadStatsStorage();
     const localRecords = storage.records;
@@ -3074,6 +3147,7 @@
     const hasRecords = records.length > 0;
     setHiddenIfChanged(els.statsResetConfirm, !statsResetConfirmVisible);
     renderStatsMonthControls(records);
+    renderStatsRankingControls();
     statsRecentCount = normalizeRecentStatsCount(statsRecentCount, records.length);
     const totalPages = Math.max(1, Math.ceil(records.length / STATS_HISTORY_PAGE_SIZE));
     statsHistoryPage = clampNumber(statsHistoryPage, 1, totalPages);
