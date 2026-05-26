@@ -438,6 +438,28 @@
 
       return { ok: true, data };
     },
+
+    async deleteOwnHanchanStats() {
+      const client = getSupabaseClient();
+      if (!client) return unavailableResult("deleteOwnHanchanStats");
+      const userResult = await ensureSupabaseUser();
+      if (!userResult.ok) return userResult;
+      const userId = userResult.user?.id || null;
+      if (!userId) {
+        return { ok: true, skipped: true, reason: "Supabase user unavailable." };
+      }
+
+      const { error } = await client
+        .from(supabaseConfig.hanchanStatsTable)
+        .delete()
+        .eq("user_id", userId);
+
+      if (error) {
+        return { ok: false, error, reason: error.message || "謌千ｸｾ縺ｮ蜑企勁縺ｫ螟ｱ謨励＠縺ｾ縺励◆" };
+      }
+
+      return { ok: true };
+    },
   };
 
   const authApi = {
