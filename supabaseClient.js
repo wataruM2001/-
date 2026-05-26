@@ -118,18 +118,45 @@
     return { ok: true, user: data?.user || null };
   }
 
+  async function ensureSupabaseUser() {
+    const client = getSupabaseClient();
+    if (!client) return unavailableResult("ensureSupabaseUser");
+
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    if (sessionError) {
+      return { ok: false, error: sessionError, reason: sessionError.message || "Supabase Auth session could not be loaded." };
+    }
+    if (sessionData?.session?.user) {
+      return { ok: true, user: sessionData.session.user, anonymousCreated: false };
+    }
+
+    if (!client.auth.signInAnonymously) {
+      return { ok: false, skipped: true, reason: "Supabase anonymous sign-in is not available." };
+    }
+
+    const { data, error } = await client.auth.signInAnonymously();
+    if (error) {
+      return { ok: false, skipped: true, error, reason: error.message || "Anonymous sign-in failed." };
+    }
+
+    return { ok: true, user: data?.user || data?.session?.user || null, anonymousCreated: true };
+  }
+
   async function getCurrentSupabaseUserId() {
     const result = await getCurrentSupabaseUser();
     if (!result.ok) return null;
     return result.user?.id || null;
   }
 
-  async function ensureUserProfile() {
+  async function ensureUserProfile(userInput = null) {
     const client = getSupabaseClient();
     if (!client) return unavailableResult("ensureUserProfile");
-    const userResult = await getCurrentSupabaseUser();
-    if (!userResult.ok) return userResult;
-    const user = userResult.user;
+    let user = userInput;
+    if (!user?.id) {
+      const userResult = await ensureSupabaseUser();
+      if (!userResult.ok) return userResult;
+      user = userResult.user;
+    }
     if (!user?.id) return { ok: false, skipped: true, reason: "ログインするとランキングに成績を保存できます" };
 
     const { data: existing, error: selectError } = await client
@@ -144,7 +171,7 @@
       .from(supabaseConfig.profilesTable)
       .insert({
         user_id: user.id,
-        display_name: `User ${String(user.id).slice(0, 4)}`,
+        display_name: `匿名ユーザー${String(user.id).slice(-4)}`,
       });
     if (insertError && insertError.code !== "23505") {
       return { ok: false, error: insertError, reason: insertError.message || "プロフィールを作成できませんでした" };
@@ -270,13 +297,13 @@
     async saveHanchanStats(rows) {
       const client = getSupabaseClient();
       if (!client) return unavailableResult("saveHanchanStats");
-      const userResult = await getCurrentSupabaseUser();
+      const userResult = await ensureSupabaseUser();
       if (!userResult.ok) return userResult;
       const userId = userResult.user?.id || null;
       if (!userId) {
         return { ok: true, skipped: true, reason: "ログインするとランキングに成績を保存できます" };
       }
-      const profileResult = await ensureUserProfile();
+      const profileResult = await ensureUserProfile(userResult.user);
       if (!profileResult.ok && !profileResult.skipped) return profileResult;
 
       const statsRows = (Array.isArray(rows) ? rows : [rows]).filter(Boolean).map((row) => ({
@@ -307,6 +334,7 @@
     isConfigured,
     getCurrentSupabaseUser,
     getCurrentSupabaseUserId,
+    ensureSupabaseUser,
     ensureUserProfile,
 
     async getSession() {
