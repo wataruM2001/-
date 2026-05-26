@@ -2485,7 +2485,7 @@
         return;
       }
       if (result?.duplicate) {
-        console.log("Supabase stats already saved", { hanchanId: row.hanchan_id });
+        console.warn("Supabase stats already saved for this hanchan.", { hanchanId: row.hanchan_id });
         return;
       }
       if (!result.ok) {
