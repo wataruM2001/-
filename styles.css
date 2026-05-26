@@ -1952,10 +1952,7 @@ button {
   justify-content: flex-start;
 }
 
-.river-column.has-riichi-discard {
-  justify-content: space-between;
-}
-
+.river-column.has-riichi-discard,
 .river-column.no-riichi-discard {
   row-gap: 0;
 }
