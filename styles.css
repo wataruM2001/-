@@ -240,21 +240,6 @@ button {
   pointer-events: none;
 }
 
-.start-logo-image {
-  display: block;
-  width: clamp(300px, 41vw, 620px);
-  height: clamp(96px, 13vw, 178px);
-  max-width: min(74vw, 660px);
-  object-fit: cover;
-  object-position: center;
-  border-radius: 12px;
-  filter:
-    drop-shadow(0 12px 22px rgba(0, 0, 0, 0.62))
-    drop-shadow(0 0 18px rgba(255, 211, 96, 0.28));
-  pointer-events: none;
-  user-select: none;
-}
-
 .start-menu-secondary {
   display: none;
 }
@@ -363,12 +348,6 @@ button {
   .battle-surface.is-start-screen .battle-control-row {
     justify-content: center;
     gap: 16px;
-  }
-
-  .start-logo-image {
-    width: min(88vw, 390px);
-    height: clamp(82px, 22vw, 120px);
-    border-radius: 10px;
   }
 
   .battle-surface.is-start-screen .start-menu-button {
