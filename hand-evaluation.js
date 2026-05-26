@@ -604,7 +604,11 @@
     if (yakuman.length > 0) return yakuman;
 
     const yaku = [];
-    if (context.isRiichi) yaku.push({ id: "riichi", name: "riichi", han: 1 });
+    if (context.isDoubleRiichi) {
+      yaku.push({ id: "double_riichi", name: "double_riichi", han: 2 });
+    } else if (context.isRiichi) {
+      yaku.push({ id: "riichi", name: "riichi", han: 1 });
+    }
     if (context.isIppatsu) yaku.push({ id: "ippatsu", name: "ippatsu", han: 1 });
     if (context.isRinshan && features.isTsumo) yaku.push({ id: "rinshan_kaihou", name: "rinshan_kaihou", han: 1 });
     if (features.isMenzen && features.isTsumo) yaku.push({ id: "menzen_tsumo", name: "menzen_tsumo", han: 1 });
