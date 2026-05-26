@@ -108,7 +108,9 @@
   let statsSelectedYear = new Date().getFullYear();
   let statsSelectedMonth = new Date().getMonth() + 1;
   let statsSupabaseRecords = [];
+  let statsSupabaseLoadState = "idle";
   let statsSupabaseStatusText = "読み込み前";
+  let statsDataSourceStatusText = "表示中：端末内成績";
   let statsRankingRows = [];
   let statsRankingStatusText = "読み込み前";
   let statsOnlineLoadToken = 0;
@@ -172,6 +174,7 @@
     statsRecentCountInput: document.getElementById("statsRecentCountInput"),
     statsYearSelect: document.getElementById("statsYearSelect"),
     statsMonthSelect: document.getElementById("statsMonthSelect"),
+    statsDataSourceStatus: document.getElementById("statsDataSourceStatus"),
     statsSummaryTable: document.getElementById("statsSummaryTable"),
     statsHistoryTable: document.getElementById("statsHistoryTable"),
     statsSupabaseStatus: document.getElementById("statsSupabaseStatus"),
@@ -717,8 +720,10 @@
       statsHistoryPage = 1;
       statsResetConfirmVisible = false;
       statsSupabaseRecords = [];
+      statsSupabaseLoadState = "loading";
       statsRankingRows = [];
       statsSupabaseStatusText = "Supabase成績を読み込み中...";
+      statsDataSourceStatusText = "表示中：Supabase成績を読み込み中...";
       statsRankingStatusText = "ランキングを読み込み中...";
       appScreen = "stats";
       renderBattleTable();
@@ -2884,13 +2889,17 @@
     const token = statsOnlineLoadToken + 1;
     statsOnlineLoadToken = token;
     if (!window.statsApi?.isConfigured?.()) {
+      statsSupabaseLoadState = "unavailable";
       statsSupabaseStatusText = "Supabaseが未設定です";
+      statsDataSourceStatusText = "表示中：端末内成績";
       statsRankingStatusText = "Supabaseが未設定です";
       renderStatsScreen();
       return;
     }
 
+    statsSupabaseLoadState = "loading";
     statsSupabaseStatusText = "Supabase成績を読み込み中...";
+    statsDataSourceStatusText = "表示中：Supabase成績を読み込み中...";
     statsRankingStatusText = "ランキングを読み込み中...";
     renderStatsScreen();
 
@@ -2903,10 +2912,14 @@
     const ownValue = ownResult.status === "fulfilled" ? ownResult.value : null;
     if (ownValue?.ok) {
       statsSupabaseRecords = (ownValue.data || []).map(supabaseStatRowToRecord);
+      statsSupabaseLoadState = "success";
       statsSupabaseStatusText = `Supabase保存済み: ${statsSupabaseRecords.length}件`;
+      statsDataSourceStatusText = "表示中：Supabase成績";
     } else {
       statsSupabaseRecords = [];
+      statsSupabaseLoadState = "error";
       statsSupabaseStatusText = ownValue?.reason || ownResult.reason?.message || "Supabase成績を読み込めませんでした";
+      statsDataSourceStatusText = "表示中：端末内成績（Supabase取得失敗）";
     }
 
     const rankingValue = rankingResult.status === "fulfilled" ? rankingResult.value : null;
@@ -3025,9 +3038,35 @@
     `;
   }
 
+  function getStatsDisplayRecords(localRecords = []) {
+    if (statsSupabaseLoadState === "success") {
+      return {
+        records: statsSupabaseRecords,
+        source: "supabase",
+      };
+    }
+    return {
+      records: localRecords,
+      source: "local",
+    };
+  }
+
+  function statsEmptyMessageText(source, hasLocalRecords) {
+    if (statsSupabaseLoadState === "loading") return "成績を読み込み中…";
+    if (source === "supabase") {
+      return "Supabase成績はまだありません。\n半荘を1回終了すると、ここに成績が記録されます。";
+    }
+    if (statsSupabaseLoadState === "error" && hasLocalRecords) {
+      return "Supabase成績を取得できませんでした。\n端末内成績を表示します。";
+    }
+    return "まだ成績がありません。\n半荘を1回終了すると、ここに成績が記録されます。";
+  }
+
   function renderStatsScreen() {
     const storage = loadStatsStorage();
-    const records = storage.records;
+    const localRecords = storage.records;
+    const displayData = getStatsDisplayRecords(localRecords);
+    const records = displayData.records;
     const hasRecords = records.length > 0;
     setHiddenIfChanged(els.statsResetConfirm, !statsResetConfirmVisible);
     renderStatsMonthControls(records);
@@ -3036,7 +3075,9 @@
     statsHistoryPage = clampNumber(statsHistoryPage, 1, totalPages);
 
     setHiddenIfChanged(els.statsEmptyMessage, hasRecords);
+    if (els.statsEmptyMessage) setTextIfChanged(els.statsEmptyMessage, statsEmptyMessageText(displayData.source, localRecords.length > 0));
     setHiddenIfChanged(els.statsContent, false);
+    if (els.statsDataSourceStatus) setTextIfChanged(els.statsDataSourceStatus, statsDataSourceStatusText);
     if (els.statsSupabaseStatus) setTextIfChanged(els.statsSupabaseStatus, statsSupabaseStatusText);
     if (els.statsRankingStatus) setTextIfChanged(els.statsRankingStatus, statsRankingStatusText);
     if (els.statsSupabaseTable) setHtmlIfChanged(els.statsSupabaseTable, renderSupabaseStatsTable(statsSupabaseRecords));
