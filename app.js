@@ -311,13 +311,36 @@
     localStorage.removeItem(IN_PROGRESS_STORAGE_KEY);
   }
 
-  function saveInProgressHanchan() {
+  function normalizeHanchanTimingFields(gameState, fallbackStartedAt = "") {
+    if (!gameState) return null;
+    const startedAt = String(gameState.hanchanStartedAt || fallbackStartedAt || paifuReplay?.startedAt || new Date().toISOString());
+    const totalPausedSeconds = Math.max(0, Math.floor(Number(gameState.totalPausedSeconds) || 0));
+    const disconnectedAt = gameState.disconnectedAt ? String(gameState.disconnectedAt) : null;
+    gameState.hanchanStartedAt = startedAt;
+    gameState.totalPausedSeconds = totalPausedSeconds;
+    gameState.disconnectedAt = disconnectedAt;
+    return { hanchanStartedAt: startedAt, totalPausedSeconds, disconnectedAt };
+  }
+
+  function saveInProgressHanchan(options = {}) {
     if (!battleState || isViewingSharedPaifu || !["playing", "result"].includes(appScreen)) return;
+    const markDisconnected = Boolean(options.markDisconnected);
+    const nowIso = new Date().toISOString();
+    normalizeHanchanTimingFields(battleState);
+    const battleStateForSave = cloneStorageData(battleState);
+    normalizeHanchanTimingFields(battleStateForSave);
+    if (markDisconnected && !battleStateForSave.disconnectedAt) {
+      battleStateForSave.disconnectedAt = nowIso;
+      battleState.disconnectedAt = nowIso;
+    }
     const payload = {
       version: 1,
-      savedAt: new Date().toISOString(),
+      savedAt: nowIso,
       appScreen,
-      battleState: cloneStorageData(battleState),
+      hanchanStartedAt: battleStateForSave.hanchanStartedAt,
+      disconnectedAt: battleStateForSave.disconnectedAt || null,
+      totalPausedSeconds: Math.max(0, Math.floor(Number(battleStateForSave.totalPausedSeconds) || 0)),
+      battleState: battleStateForSave,
       lastHandResult: cloneStorageData(lastHandResult),
       paifuReplay: cloneStorageData(paifuReplay),
       paifuHandIndex,
@@ -332,8 +355,41 @@
     }
   }
 
+  function saveInProgressHanchanBeforeDisconnect() {
+    saveInProgressHanchan({ markDisconnected: true });
+  }
+
+  function applyResumePausedTime(save) {
+    if (!save?.battleState) return save;
+    const next = cloneStorageData(save);
+    const battleSave = next.battleState;
+    const timing = normalizeHanchanTimingFields(
+      battleSave,
+      next.hanchanStartedAt || next.paifuReplay?.startedAt || ""
+    );
+    const disconnectedAt = next.disconnectedAt || timing?.disconnectedAt || battleSave.disconnectedAt;
+    let totalPausedSeconds = Math.max(
+      0,
+      Math.floor(Number(next.totalPausedSeconds ?? battleSave.totalPausedSeconds) || 0)
+    );
+    if (disconnectedAt) {
+      const disconnectedMs = new Date(disconnectedAt).getTime();
+      const resumedMs = Date.now();
+      if (Number.isFinite(disconnectedMs) && Number.isFinite(resumedMs)) {
+        totalPausedSeconds += Math.max(0, Math.floor((resumedMs - disconnectedMs) / 1000));
+      }
+    }
+    battleSave.hanchanStartedAt = timing?.hanchanStartedAt || next.hanchanStartedAt || next.paifuReplay?.startedAt || "";
+    battleSave.totalPausedSeconds = totalPausedSeconds;
+    battleSave.disconnectedAt = null;
+    next.hanchanStartedAt = battleSave.hanchanStartedAt;
+    next.totalPausedSeconds = totalPausedSeconds;
+    next.disconnectedAt = null;
+    return next;
+  }
+
   function resumeInProgressHanchan() {
-    const save = loadInProgressHanchanSave();
+    const save = applyResumePausedTime(loadInProgressHanchanSave());
     if (!save) {
       appScreen = "start";
       renderBattleTable();
@@ -346,6 +402,7 @@
     stopPaifuPlayback();
     resetBattleEffectState();
     battleState = cloneStorageData(save.battleState);
+    normalizeHanchanTimingFields(battleState, save.hanchanStartedAt || save.paifuReplay?.startedAt || "");
     lastHandResult = cloneStorageData(save.lastHandResult) || null;
     battleSettlement = null;
     paifuReplay = cloneStorageData(save.paifuReplay) || createPaifuReplay();
@@ -366,6 +423,7 @@
         scheduleCpuTurn();
       }
     }
+    saveInProgressHanchan();
   }
 
   function updateResultPanelBounds() {
@@ -541,8 +599,8 @@
     });
     document.addEventListener("contextmenu", handleContextMenuTsumogiri);
     els.battleSurface?.addEventListener("pointerup", handleLandscapeBlankDoubleTap);
-    window.addEventListener("pagehide", saveInProgressHanchan);
-    window.addEventListener("beforeunload", saveInProgressHanchan);
+    window.addEventListener("pagehide", saveInProgressHanchanBeforeDisconnect);
+    window.addEventListener("beforeunload", saveInProgressHanchanBeforeDisconnect);
     window.addEventListener("resize", () => {
       if (appScreen === "result") updateResultPanelBounds();
     });
@@ -788,6 +846,7 @@
       honba: 0,
       kyotaku: 0,
     });
+    normalizeHanchanTimingFields(battleState, paifuReplay.startedAt);
     recordPaifuSnapshot(battleState, "deal", `${battleRoundText(battleState)}${battleState.honba}本場 開始`);
     enterResultIfHandEnded();
     renderBattleTable();
@@ -1572,6 +1631,7 @@
       points: player.points,
       chips: player.chips,
     }));
+    const hanchanTiming = normalizeHanchanTimingFields(battleState);
     appScreen = "playing";
     lastHandResult = null;
     battleSettlement = null;
@@ -1588,6 +1648,11 @@
       },
       previousPlayers
     );
+    if (hanchanTiming) {
+      battleState.hanchanStartedAt = hanchanTiming.hanchanStartedAt;
+      battleState.totalPausedSeconds = hanchanTiming.totalPausedSeconds;
+      battleState.disconnectedAt = null;
+    }
     recordPaifuSnapshot(battleState, "deal", `${battleRoundText(battleState)}${battleState.honba}本場 開始`);
     enterResultIfHandEnded();
     renderBattleTable();
@@ -1959,13 +2024,10 @@
     const endedAt = String(record.endedAt || record.ended_at || record.created_at || "");
     if (!id || !endedAt) return null;
     const rawDuration = Number(record.durationSeconds ?? record.duration_seconds);
-    const startedMs = new Date(startedAt).getTime();
-    const endedMs = new Date(endedAt).getTime();
-    const durationSeconds = Number.isFinite(rawDuration)
+    const durationExcludesPaused = record.durationExcludesPaused === true || record.duration_excludes_paused === true;
+    const durationSeconds = durationExcludesPaused && Number.isFinite(rawDuration)
       ? Math.max(0, Math.floor(rawDuration))
-      : Number.isFinite(startedMs) && Number.isFinite(endedMs)
-        ? Math.max(0, Math.floor((endedMs - startedMs) / 1000))
-        : null;
+      : null;
     return {
       id,
       startedAt,
@@ -1980,6 +2042,7 @@
       riichiCount: Math.max(0, Math.round(Number(record.riichiCount ?? record.riichi_count ?? 0) || 0)),
       calledHandCount: Math.max(0, Math.round(Number(record.calledHandCount ?? record.called_hand_count ?? 0) || 0)),
       durationSeconds,
+      durationExcludesPaused,
     };
   }
 
@@ -2023,18 +2086,24 @@
     return counts;
   }
 
+  function calculateHanchanDurationSeconds(startedAt, endedAt, pausedSeconds = 0) {
+    const startedMs = new Date(startedAt).getTime();
+    const endedMs = new Date(endedAt).getTime();
+    if (!Number.isFinite(startedMs) || !Number.isFinite(endedMs)) return null;
+    const rawSeconds = Math.max(0, Math.floor((endedMs - startedMs) / 1000));
+    const safePausedSeconds = Math.max(0, Math.floor(Number(pausedSeconds) || 0));
+    return Math.max(0, rawSeconds - safePausedSeconds);
+  }
+
   function buildHanchanStatRecord(settlement) {
     const selfSettlement = (settlement || []).find((item) => item.index === 0) || null;
     if (!selfSettlement || !paifuReplay?.id) return null;
     const selfPlayerId = selfPlayerIdFromReplay();
     const counts = countSelfReplayStats(selfPlayerId);
-    const startedAt = paifuReplay.startedAt || "";
+    const timing = normalizeHanchanTimingFields(battleState, paifuReplay.startedAt);
+    const startedAt = timing?.hanchanStartedAt || paifuReplay.startedAt || "";
     const endedAt = paifuReplay.endedAt || new Date().toISOString();
-    const startedMs = new Date(startedAt).getTime();
-    const endedMs = new Date(endedAt).getTime();
-    const durationSeconds = Number.isFinite(startedMs) && Number.isFinite(endedMs)
-      ? Math.max(0, Math.floor((endedMs - startedMs) / 1000))
-      : null;
+    const durationSeconds = calculateHanchanDurationSeconds(startedAt, endedAt, timing?.totalPausedSeconds || 0);
     return {
       id: paifuReplay.id,
       startedAt,
@@ -2049,6 +2118,7 @@
       riichiCount: counts.riichiCount,
       calledHandCount: counts.calledHandCount,
       durationSeconds,
+      durationExcludesPaused: true,
     };
   }
 
