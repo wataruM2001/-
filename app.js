@@ -1662,6 +1662,25 @@
     });
   }
 
+  function shouldAutoContinueCpuOorasu(result = lastHandResult) {
+    if (!result?.requiresOorasuDealerChoice || result.cpuAutoContinueQueued) return false;
+    const dealer = battleState?.players?.[battleState.dealerIndex];
+    return Boolean(dealer?.isCpu);
+  }
+
+  function queueCpuOorasuContinueIfNeeded() {
+    if (!shouldAutoContinueCpuOorasu()) return;
+    lastHandResult = {
+      ...lastHandResult,
+      cpuAutoContinueQueued: true,
+    };
+    window.setTimeout(() => {
+      if (shouldAutoContinueCpuOorasu({ ...lastHandResult, cpuAutoContinueQueued: false })) {
+        handleContinueOorasu();
+      }
+    }, 300);
+  }
+
   function handleEndOorasu() {
     if (!lastHandResult?.canEndOorasu) return;
     lastHandResult = {
@@ -3218,9 +3237,11 @@
         ${renderSimpleBattleResultRows(result)}
       </div>
     `;
+    const autoContinueCpuOorasu = shouldAutoContinueCpuOorasu(result);
     els.battleConfirmButton.hidden = result.requiresOorasuDealerChoice;
-    els.battleContinueButton.hidden = !result.requiresOorasuDealerChoice;
-    els.battleEndButton.hidden = !result.requiresOorasuDealerChoice;
+    els.battleContinueButton.hidden = !result.requiresOorasuDealerChoice || autoContinueCpuOorasu;
+    els.battleEndButton.hidden = !result.requiresOorasuDealerChoice || autoContinueCpuOorasu;
+    queueCpuOorasuContinueIfNeeded();
   }
 
   function renderBattleSettlementPanel() {
@@ -3674,6 +3695,11 @@
     return [...(tiles || [])].sort(compareBattleTiles);
   }
 
+  function sortedBattleTilesForSeat(tiles, seat) {
+    const sorted = sortedBattleTiles(tiles);
+    return seat === "shimocha" ? sorted.reverse() : sorted;
+  }
+
   function battleWinActionWinnerIndexes(gameState = battleState) {
     const action = gameState?.lastAction || {};
     if (action.type !== "win") return [];
@@ -3720,7 +3746,7 @@
     });
 
     return {
-      concealed: sortedBattleTiles(concealed),
+      concealed: sortedBattleTilesForSeat(concealed, playerDisplaySeat(player, playerIndex)),
       drawnTile,
     };
   }
@@ -3754,7 +3780,9 @@
     const drawnTile = display.drawnTile
       ? renderBattleTile(display.drawnTile, `${classPrefix}drawn discard-disabled`.trim())
       : "";
-    return normalTiles + drawnTile;
+    return playerDisplaySeat(player, playerIndex) === "shimocha"
+      ? drawnTile + normalTiles
+      : normalTiles + drawnTile;
   }
 
   function canSelectBattleDiscard(tile, playerIndex) {
@@ -4094,13 +4122,13 @@
       els.battleLeftHand,
       isBattleWinPlayerIndex(leftIndex)
         ? renderOpenBattleHand(leftPlayer, leftIndex, "side")
-        : renderBackTiles(leftPlayer?.hand.length || 0, "side", drawnTileIdForPlayer(leftIndex))
+        : renderSideBackHand(leftPlayer, leftIndex)
     );
     setHtmlIfChanged(
       els.battleRightHand,
       isBattleWinPlayerIndex(rightIndex)
         ? renderOpenBattleHand(rightPlayer, rightIndex, "side")
-        : renderBackTiles(rightPlayer?.hand.length || 0, "side", drawnTileIdForPlayer(rightIndex))
+        : renderSideBackHand(rightPlayer, rightIndex)
     );
     renderBattleScreenPanels();
   }
@@ -4165,6 +4193,21 @@
         .join(" ");
       return `<img class="table-tile-img ${classes}" src="${escapeHtml(Tiles.tileImagePath("blue_back"))}" alt="opponent tile ${index + 1}" loading="lazy" />`;
     }).join("");
+  }
+
+  function renderSideBackHand(player, playerIndex) {
+    const count = player?.hand?.length || 0;
+    const drawnTileId = drawnTileIdForPlayer(playerIndex);
+    if (!drawnTileId || count <= 0) return renderBackTiles(count, "side");
+    const renderBack = (index, isDrawn = false) => {
+      const classes = ["table-back", "side", isDrawn ? "drawn" : ""].filter(Boolean).join(" ");
+      return `<img class="table-tile-img ${classes}" src="${escapeHtml(Tiles.tileImagePath("blue_back"))}" alt="opponent tile ${index + 1}" loading="lazy" />`;
+    };
+    const normalTiles = Array.from({ length: Math.max(0, count - 1) }, (_, index) => renderBack(index)).join("");
+    const drawnTile = renderBack(count - 1, true);
+    return playerDisplaySeat(player, playerIndex) === "shimocha"
+      ? drawnTile + normalTiles
+      : normalTiles + drawnTile;
   }
 
   function populatePlayerSelects() {
