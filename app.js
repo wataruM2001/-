@@ -365,10 +365,19 @@
       return;
     }
     try {
-      const result = await api.getSession();
+      const result = await api.ensureSupabaseUser?.() || await api.getSession();
       if (result?.ok) {
         authSession = result.session || null;
         authUser = result.user || authSession?.user || null;
+        if (authUser?.id) {
+          api.ensureUserProfile?.(authUser).catch((error) => {
+            console.error("Supabase profile creation failed", error);
+          });
+        }
+        if (result.anonymousCreated) {
+          authMessageText = "匿名ユーザーでランキング参加中";
+          authMessageIsError = false;
+        }
       }
     } catch (error) {
       authMessageText = "Auth状態を取得できませんでした";
@@ -378,6 +387,11 @@
       authSubscription = api.onAuthStateChange?.((event, session) => {
         authSession = session || null;
         authUser = session?.user || null;
+        if (event === "SIGNED_IN" && authUser?.id) {
+          api.ensureUserProfile?.(authUser).catch((error) => {
+            console.error("Supabase profile creation failed", error);
+          });
+        }
         if (event === "SIGNED_IN") {
           authMessageText = "ログインしました";
           authMessageIsError = false;
@@ -395,11 +409,20 @@
     return authUser?.email || authSession?.user?.email || "";
   }
 
+  function authUserDisplayName() {
+    const email = authUserEmail();
+    if (email) return email;
+    const userId = authUser?.id || authSession?.user?.id || "";
+    if (userId) return `匿名ユーザー${String(userId).slice(-4)}`;
+    return "未ログイン";
+  }
+
   function renderAuthPanel() {
     if (!els.authPanel) return;
     const email = authUserEmail();
-    const isSignedIn = Boolean(email);
+    const isSignedIn = Boolean(authUser?.id || authSession?.user?.id);
     setTextIfChanged(els.authStatus, isSignedIn ? email : "未ログイン");
+    setTextIfChanged(els.authStatus, authUserDisplayName());
     setHiddenIfChanged(els.authForm, isSignedIn);
     setHiddenIfChanged(els.authLogoutButton, !isSignedIn);
     if (els.authLoginButton) els.authLoginButton.disabled = false;
