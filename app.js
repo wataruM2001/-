@@ -916,11 +916,8 @@
       statsResetConfirmVisible = false;
       renderStatsScreen();
     });
-    els.statsResetConfirmButton?.addEventListener("click", () => {
-      localStorage.removeItem(STATS_STORAGE_KEY);
-      statsHistoryPage = 1;
-      statsResetConfirmVisible = false;
-      renderStatsScreen();
+    els.statsResetConfirmButton?.addEventListener("click", async () => {
+      await resetAllStatsForCurrentUser();
     });
     els.authForm?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -2491,6 +2488,33 @@
     }
   }
 
+  async function resetAllStatsForCurrentUser() {
+    localStorage.removeItem(STATS_STORAGE_KEY);
+    statsHistoryPage = 1;
+    statsResetConfirmVisible = false;
+
+    if (window.statsApi?.isConfigured?.() && window.statsApi?.deleteOwnHanchanStats) {
+      const result = await window.statsApi.deleteOwnHanchanStats();
+      if (!result?.ok && !result?.skipped) {
+        console.error("Supabase stats delete failed", result?.error || result?.reason || result);
+        statsSupabaseStatusText = "成績の削除に失敗しました。時間をおいて再度お試しください。";
+        renderStatsScreen();
+        return;
+      }
+    }
+
+    statsSupabaseRecords = [];
+    statsRankingRows = [];
+    statsSupabaseLoadState = window.statsApi?.isConfigured?.() ? "success" : "unavailable";
+    statsSupabaseStatusText = "";
+    statsRankingStatusText = "";
+    statsDataSourceStatusText = "";
+    renderStatsScreen();
+    if (window.statsApi?.isConfigured?.()) {
+      loadStatsOnlineData();
+    }
+  }
+
   function saveStatsStorage(storage) {
     try {
       const records = Array.isArray(storage?.records) ? storage.records.map(normalizeHanchanStatRecord).filter(Boolean) : [];
@@ -2957,7 +2981,7 @@
     const rankingValue = rankingResult.status === "fulfilled" ? rankingResult.value : null;
     if (rankingValue?.ok) {
       statsRankingRows = rankingValue.data || [];
-      statsRankingStatusText = "\u4e0a\u4f4d10\u4eba";
+      statsRankingStatusText = "";
     } else {
       statsRankingRows = [];
       statsRankingStatusText = rankingValue?.reason || rankingResult.reason?.message || "\u30e9\u30f3\u30ad\u30f3\u30b0\u3092\u53d6\u5f97\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002";
