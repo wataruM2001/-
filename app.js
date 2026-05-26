@@ -21,11 +21,12 @@
   const STATS_HISTORY_PAGE_SIZE = 10;
   const STATS_RANKING_LIMIT = 10;
   const STATS_RANKING_METRICS = {
+    hanchan_count: { label: "\u534a\u8358\u6570", format: "plain", direction: "desc" },
     average_settlement_point: { label: "\u5e73\u5747\u53ce\u652f", format: "signed", direction: "desc" },
     average_rank: { label: "\u5e73\u5747\u7740\u9806", format: "rank", direction: "asc" },
+    average_final_raw_score: { label: "\u5e73\u5747\u7d20\u70b9", format: "plain", direction: "desc" },
     average_chip_count: { label: "\u5e73\u5747\u795d\u5100", format: "signed", direction: "desc" },
     win_rate: { label: "\u548c\u4e86\u7387", format: "percent", direction: "desc" },
-    round_profit: { label: "\u5c40\u53ce\u652f", format: "signed", direction: "desc" },
   };
   const APP_VERSION = "shared-paifu-url-v1";
   const RULES_VERSION = "marchao-sanma-v1";
@@ -132,6 +133,10 @@
   let authMessageText = "";
   let authMessageIsError = false;
   let authSubscription = null;
+  let settingsDisplayName = "";
+  let settingsMessageText = "";
+  let settingsMessageIsError = false;
+  let settingsSaveInProgress = false;
 
   const els = {
     undoButton: document.getElementById("undoButton"),
@@ -177,6 +182,7 @@
     rulesBackButton: document.getElementById("rulesBackButton"),
     startRulesButton: document.getElementById("startRulesButton"),
     startStatsButton: document.getElementById("startStatsButton"),
+    startSettingsButton: document.getElementById("startSettingsButton"),
     statsScreen: document.getElementById("statsScreen"),
     statsBackButton: document.getElementById("statsBackButton"),
     statsEmptyMessage: document.getElementById("statsEmptyMessage"),
@@ -200,6 +206,11 @@
     statsResetConfirm: document.getElementById("statsResetConfirm"),
     statsResetCancelButton: document.getElementById("statsResetCancelButton"),
     statsResetConfirmButton: document.getElementById("statsResetConfirmButton"),
+    settingsScreen: document.getElementById("settingsScreen"),
+    settingsBackButton: document.getElementById("settingsBackButton"),
+    settingsDisplayNameInput: document.getElementById("settingsDisplayNameInput"),
+    settingsSaveNameButton: document.getElementById("settingsSaveNameButton"),
+    settingsMessage: document.getElementById("settingsMessage"),
     resumeRequiredScreen: document.getElementById("resumeRequiredScreen"),
     resumeRequiredButton: document.getElementById("resumeRequiredButton"),
     battleSelfHand: document.getElementById("battleSelfHand"),
@@ -506,6 +517,103 @@
     renderAuthPanel();
   }
 
+  function defaultDisplayNameForUser(user = authUser || authSession?.user || null) {
+    const userId = user?.id || "";
+    return userId ? `\u533f\u540d\u30e6\u30fc\u30b6\u30fc${String(userId).slice(-4)}` : "\u533f\u540d\u30e6\u30fc\u30b6\u30fc";
+  }
+
+  function renderSettingsScreen() {
+    if (els.settingsDisplayNameInput && document.activeElement !== els.settingsDisplayNameInput) {
+      els.settingsDisplayNameInput.value = settingsDisplayName || "";
+    }
+    if (els.settingsSaveNameButton) {
+      els.settingsSaveNameButton.disabled = Boolean(settingsSaveInProgress);
+    }
+    if (els.settingsMessage) {
+      setTextIfChanged(els.settingsMessage, settingsMessageText);
+      els.settingsMessage.classList.toggle("is-error", Boolean(settingsMessageIsError));
+      setHiddenIfChanged(els.settingsMessage, !settingsMessageText);
+    }
+  }
+
+  async function loadSettingsProfile() {
+    const api = window.authApi;
+    if (!api?.getUserProfile) {
+      settingsMessageText = "Supabase Authを読み込めませんでした";
+      settingsMessageIsError = true;
+      renderSettingsScreen();
+      return;
+    }
+    settingsMessageText = "ユーザー情報を読み込み中...";
+    settingsMessageIsError = false;
+    renderSettingsScreen();
+    const result = await api.getUserProfile();
+    if (result?.ok) {
+      authUser = result.user || authUser;
+      settingsDisplayName = result.data?.display_name || defaultDisplayNameForUser(result.user);
+      settingsMessageText = "";
+      settingsMessageIsError = false;
+    } else {
+      settingsDisplayName = defaultDisplayNameForUser();
+      settingsMessageText = result?.reason || "ユーザー情報を取得できませんでした";
+      settingsMessageIsError = true;
+    }
+    renderSettingsScreen();
+    renderAuthPanel();
+  }
+
+  function openSettingsScreen() {
+    settingsMessageText = "";
+    settingsMessageIsError = false;
+    settingsSaveInProgress = false;
+    appScreen = "settings";
+    renderBattleTable();
+    loadSettingsProfile();
+  }
+
+  async function handleSaveSettingsDisplayName() {
+    const api = window.authApi;
+    const rawName = els.settingsDisplayNameInput?.value || "";
+    const trimmed = rawName.trim();
+    if (!trimmed) {
+      settingsMessageText = "ユーザー名を入力してください";
+      settingsMessageIsError = true;
+      renderSettingsScreen();
+      return;
+    }
+    if ([...trimmed].length > 8) {
+      settingsMessageText = "ユーザー名は8文字以内にしてください";
+      settingsMessageIsError = true;
+      renderSettingsScreen();
+      return;
+    }
+    if (!api?.updateProfileDisplayName) {
+      settingsMessageText = "Supabase Authを読み込めませんでした";
+      settingsMessageIsError = true;
+      renderSettingsScreen();
+      return;
+    }
+    settingsSaveInProgress = true;
+    settingsMessageText = "保存中...";
+    settingsMessageIsError = false;
+    renderSettingsScreen();
+    const result = await api.updateProfileDisplayName(trimmed);
+    settingsSaveInProgress = false;
+    if (result?.ok) {
+      authUser = result.user || authUser;
+      settingsDisplayName = result.data?.display_name || trimmed;
+      settingsMessageText = "ユーザー名を保存しました";
+      settingsMessageIsError = false;
+      statsOnlineLoadToken += 1;
+      statsRankingRows = [];
+    } else {
+      settingsMessageText = result?.reason || "ユーザー名の保存に失敗しました";
+      settingsMessageIsError = true;
+    }
+    renderSettingsScreen();
+    renderAuthPanel();
+  }
+
   function resetBattleEffectState() {
     window.clearTimeout(battleEffectTimer);
     activeBattleEffect = null;
@@ -741,6 +849,9 @@
       renderBattleTable();
       loadStatsOnlineData();
     });
+    els.startSettingsButton?.addEventListener("click", () => {
+      openSettingsScreen();
+    });
     els.rulesBackButton?.addEventListener("click", () => {
       appScreen = "start";
       renderBattleTable();
@@ -748,6 +859,16 @@
     els.statsBackButton?.addEventListener("click", () => {
       appScreen = "start";
       renderBattleTable();
+    });
+    els.settingsBackButton?.addEventListener("click", () => {
+      appScreen = "start";
+      renderBattleTable();
+    });
+    els.settingsSaveNameButton?.addEventListener("click", () => {
+      handleSaveSettingsDisplayName();
+    });
+    els.settingsDisplayNameInput?.addEventListener("input", () => {
+      settingsDisplayName = els.settingsDisplayNameInput.value.slice(0, 8);
     });
     els.statsRecentCountInput?.addEventListener("input", () => {
       const records = currentStatsDisplayRecords();
@@ -1238,6 +1359,7 @@
         ".paifu-panel",
         ".rules-screen",
         ".stats-screen",
+        ".settings-screen",
       ].join(", ")
     );
   }
@@ -2899,6 +3021,9 @@
   }
 
   function rankingMetricRawValue(row, metricKey = statsRankingKind) {
+    if (metricKey === "hanchan_count") {
+      return normalizeRankingNumber(row?.hanchan_count);
+    }
     if (metricKey === "average_chip_count") {
       const hanchanCount = normalizeRankingNumber(row?.hanchan_count);
       return hanchanCount > 0 ? normalizeRankingNumber(row?.total_chip_count) / hanchanCount : 0;
@@ -2916,7 +3041,8 @@
     if (metric.format === "duration") return formatDuration(value);
     if (metric.format === "percent") return formatPercent(value);
     if (metric.format === "rank") return Number(value || 0).toFixed(2);
-    return formatSignedNumber(value);
+    if (metric.format === "plain") return formatPlainNumber(value);
+    return formatSignedNumber(value, metricKey === "average_chip_count" ? 1 : 0);
   }
 
   function sortedRankingRows(rows = [], metricKey = statsRankingKind) {
@@ -2942,14 +3068,13 @@
         <tr>
           <th>\u9806\u4f4d</th>
           <th>\u30e6\u30fc\u30b6\u30fc\u540d</th>
+          <th class="ranking-type-value-header">\u7a2e\u5225: ${escapeHtml(metric.label)}</th>
           <th>\u534a\u8358\u6570</th>
-          <th>\u5024: ${escapeHtml(metric.label)}</th>
-          <th>\u5408\u8a08\u53ce\u652f</th>
           <th>\u5e73\u5747\u53ce\u652f</th>
           <th>\u5e73\u5747\u7740\u9806</th>
-          <th>\u5408\u8a08\u795d\u5100</th>
+          <th>\u5e73\u5747\u7d20\u70b9</th>
+          <th>\u5e73\u5747\u795d\u5100</th>
           <th>\u548c\u4e86\u7387</th>
-          <th>\u653e\u9283\u7387</th>
         </tr>
       </thead>
     `;
@@ -2957,7 +3082,7 @@
       return `
         <table class="stats-table stats-ranking-table">
           ${header}
-          <tbody><tr><td colspan="10">\u30e9\u30f3\u30ad\u30f3\u30b0\u30c7\u30fc\u30bf\u306f\u307e\u3060\u3042\u308a\u307e\u305b\u3093</td></tr></tbody>
+          <tbody><tr><td colspan="9">\u30e9\u30f3\u30ad\u30f3\u30b0\u30c7\u30fc\u30bf\u306f\u307e\u3060\u3042\u308a\u307e\u305b\u3093</td></tr></tbody>
         </table>
       `;
     }
@@ -2969,14 +3094,13 @@
             <tr>
               <td>${index + 1}</td>
               <td>${escapeHtml(row.display_name || "\u533f\u540d\u30e6\u30fc\u30b6\u30fc")}</td>
+              <td class="ranking-type-value-cell">${escapeHtml(formatRankingValue(row, statsRankingKind))}</td>
               <td>${formatPlainNumber(row.hanchan_count)}</td>
-              <td>${escapeHtml(formatRankingValue(row, statsRankingKind))}</td>
-              <td>${formatSignedNumber(row.total_settlement_point)}</td>
               <td>${formatSignedNumber(row.average_settlement_point)}</td>
               <td>${Number(row.average_rank || 0).toFixed(2)}</td>
-              <td>${formatSignedNumber(row.total_chip_count)}</td>
+              <td>${formatPlainNumber(row.average_final_raw_score)}</td>
+              <td>${formatSignedNumber(rankingMetricRawValue(row, "average_chip_count"), 1)}</td>
               <td>${formatPercent(row.win_rate)}</td>
-              <td>${formatPercent(row.deal_in_rate)}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -3759,11 +3883,13 @@
     const isSettlement = appScreen === "settlement";
     const isRules = appScreen === "rules";
     const isStats = appScreen === "stats";
+    const isSettings = appScreen === "settings";
     const isPaifu = appScreen === "paifu";
     const isResume = appScreen === "resume";
     toggleClassIfChanged(els.battleSurface, "is-start-screen", appScreen === "start");
     toggleClassIfChanged(els.battleSurface, "is-rules-screen", isRules);
     toggleClassIfChanged(els.battleSurface, "is-stats-screen", isStats);
+    toggleClassIfChanged(els.battleSurface, "is-settings-screen", isSettings);
     toggleClassIfChanged(els.battleSurface, "is-paifu-screen", isPaifu);
     toggleClassIfChanged(els.battleSurface, "is-resume-screen", isResume);
     setHiddenIfChanged(els.battleResultPanel, !isResult);
@@ -3771,6 +3897,7 @@
     setHiddenIfChanged(els.paifuPanel, !isPaifu);
     setHiddenIfChanged(els.rulesScreen, !isRules);
     setHiddenIfChanged(els.statsScreen, !isStats);
+    setHiddenIfChanged(els.settingsScreen, !isSettings);
     setHiddenIfChanged(els.resumeRequiredScreen, !isResume);
     setHiddenIfChanged(els.battleStartButton, appScreen !== "start");
     setHiddenIfChanged(els.battleActionButtons, appScreen !== "playing");
@@ -3779,6 +3906,7 @@
     if (isResult) updateResultPanelBounds();
     if (isSettlement) renderBattleSettlementPanel();
     if (isStats) renderStatsScreen();
+    if (isSettings) renderSettingsScreen();
     if (isPaifu) renderPaifuPanel();
     if (isSettlement && !isSettlementPreview) {
       clearInProgressHanchanSave();
