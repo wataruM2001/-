@@ -180,6 +180,7 @@ drop policy if exists "Users can insert own stats" on public.hanchan_stats;
 drop policy if exists "Users can read own stats" on public.hanchan_stats;
 drop policy if exists "Users can insert own hanchan stats" on public.hanchan_stats;
 drop policy if exists "Users can read own hanchan stats" on public.hanchan_stats;
+drop policy if exists "Users can delete own hanchan stats" on public.hanchan_stats;
 drop policy if exists "Users can insert own profile" on public.profiles;
 drop policy if exists "Users can read own profile" on public.profiles;
 drop policy if exists "Users can read profiles" on public.profiles;
@@ -223,5 +224,11 @@ create policy "Users can insert own hanchan stats"
 create policy "Users can read own hanchan stats"
   on public.hanchan_stats
   for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+create policy "Users can delete own hanchan stats"
+  on public.hanchan_stats
+  for delete
   to authenticated
   using (auth.uid() = user_id);
