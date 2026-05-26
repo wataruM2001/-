@@ -118,8 +118,11 @@ drop policy if exists "Public can insert shared paifus for test" on public.share
 drop policy if exists "Public can insert hanchan stats for test" on public.hanchan_stats;
 drop policy if exists "Users can insert own stats" on public.hanchan_stats;
 drop policy if exists "Users can read own stats" on public.hanchan_stats;
+drop policy if exists "Users can insert own hanchan stats" on public.hanchan_stats;
+drop policy if exists "Users can read own hanchan stats" on public.hanchan_stats;
 drop policy if exists "Users can insert own profile" on public.profiles;
 drop policy if exists "Users can read own profile" on public.profiles;
+drop policy if exists "Users can read profiles" on public.profiles;
 drop policy if exists "Users can update own profile" on public.profiles;
 
 create policy "Public can read public shared paifus"
@@ -138,11 +141,11 @@ create policy "Users can insert own profile"
   to authenticated
   with check (auth.uid() = user_id);
 
-create policy "Users can read own profile"
+create policy "Users can read profiles"
   on public.profiles
   for select
   to authenticated
-  using (auth.uid() = user_id);
+  using (true);
 
 create policy "Users can update own profile"
   on public.profiles
@@ -151,13 +154,13 @@ create policy "Users can update own profile"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy "Users can insert own stats"
+create policy "Users can insert own hanchan stats"
   on public.hanchan_stats
   for insert
   to authenticated
   with check (auth.uid() = user_id);
 
-create policy "Users can read own stats"
+create policy "Users can read own hanchan stats"
   on public.hanchan_stats
   for select
   to authenticated
