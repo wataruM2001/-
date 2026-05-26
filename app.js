@@ -1401,7 +1401,7 @@
         seat: player.seat,
         label: playerPositionLabel(player.seat),
         handTiles: sortedBattleTiles(player.hand || []),
-        revealHand: player.seat === "self" || winnerIndexes.includes(playerIndex),
+        revealHand: true,
         melds: player.melds || [],
         flowerTiles: player.flowers || [],
       }))
@@ -1456,6 +1456,10 @@
     return (tiles || [])
       .filter((tile) => tile && !tile.isFlower)
       .map(cloneResultTileSnapshot);
+  }
+
+  function cloneResultVisibleTilesSnapshot(tiles = []) {
+    return (tiles || []).filter(Boolean).map(cloneResultTileSnapshot);
   }
 
   function cloneResultMeldSnapshot(meld) {
@@ -1530,16 +1534,63 @@
       .filter(Boolean);
   }
 
+  function battleResultWinnerIndexes(action = {}) {
+    if (Array.isArray(action.winnerIndexes)) {
+      return action.winnerIndexes.filter((index) => Number.isInteger(index));
+    }
+    return Number.isInteger(action.winnerIndex) ? [action.winnerIndex] : [];
+  }
+
+  function resultDrawnTileForPlayer(gameState, playerIndex, winnerIndexes) {
+    const action = gameState?.lastAction || {};
+    if (action.type === "win" && action.winType === "tsumo" && winnerIndexes.includes(playerIndex)) {
+      return cloneResultTileSnapshot(action.winningTile);
+    }
+    return null;
+  }
+
+  function buildResultPlayerHandSnapshots(gameState) {
+    const action = gameState?.lastAction || {};
+    const winnerIndexes = battleResultWinnerIndexes(action);
+    const playersBySeat = new Map((gameState.players || []).map((player, index) => [player.seat, { player, index }]));
+    return ["self", "shimocha", "kamicha"]
+      .map((seat) => {
+        const entry = playersBySeat.get(seat);
+        const player = entry?.player;
+        if (!player) return null;
+        const drawnTile = resultDrawnTileForPlayer(gameState, entry.index, winnerIndexes);
+        const handSource = drawnTile ? removeOneTileById(player.hand || [], drawnTile.id) : player.hand || [];
+        const winningTiles = gameState?.phase === "ryukyoku" || action.type === "ryukyoku"
+          ? Game.getWinningTiles(player) || []
+          : [];
+        return {
+          playerId: player.id,
+          playerIndex: entry.index,
+          seat,
+          displayName: playerPositionLabel(seat),
+          isWinner: winnerIndexes.includes(entry.index),
+          isTenpai: winningTiles.length > 0,
+          winningTiles: [...winningTiles],
+          handTiles: sortedBattleTiles(cloneResultTilesSnapshot(handSource)),
+          drawnTile,
+          melds: cloneResultMeldsSnapshot(player.melds || []),
+          flowerTiles: cloneResultVisibleTilesSnapshot(player.flowers || []),
+        };
+      })
+      .filter(Boolean);
+  }
+
   function buildBattleHandResult(gameState) {
     const action = gameState.lastAction || {};
     const isRyukyoku = gameState.phase === "ryukyoku" || action.type === "ryukyoku";
     const type = isRyukyoku ? "ryukyoku" : action.winType === "tsumo" ? "tsumo" : "ron";
-    const winnerIds = Number.isInteger(action.winnerIndex) ? [gameState.players[action.winnerIndex].id] : [];
+    const winnerIndexes = battleResultWinnerIndexes(action);
+    const winnerIds = winnerIndexes.map((index) => gameState.players[index]?.id).filter(Boolean);
     const pointDeltas = action.pointDeltas || [0, 0, 0];
     const chipDeltas = action.chipDeltas || [0, 0, 0];
     const dealerContinue = isRyukyoku
       ? Boolean(action.dealerTenpai)
-      : Number(action.winnerIndex) === gameState.dealerIndex;
+      : winnerIndexes.includes(gameState.dealerIndex);
     const nextRound = nextBattleRoundInfo(gameState, dealerContinue, type);
     const dealerTop = isBattleSingleTop(gameState.players, gameState.dealerIndex);
     const isOorasu = isBattleOorasu(gameState);
@@ -1571,6 +1622,7 @@
       doraIndicators: gameState.doraIndicators || [],
       uraDoraIndicators: gameState.uraDoraIndicators || [],
       wins: isRyukyoku ? [] : buildBattleWinDisplayInfos(gameState, action),
+      playerHandSnapshots: buildResultPlayerHandSnapshots(gameState),
       ryukyokuHands: isRyukyoku ? buildRyukyokuHandsSnapshot(gameState) : [],
       nextRoundLabel: `${nextRound.roundWind === "south" ? "南" : "東"}${nextRound.handNumber}局${nextRound.honba}本場`,
       nextRound,
@@ -3072,6 +3124,37 @@
     `;
   }
 
+  function renderResultPlayerHandSnapshots(result) {
+    const hands = result.playerHandSnapshots || [];
+    if (!hands.length) return "";
+    return `
+      <div class="result-ryukyoku-hands result-all-player-hands">
+        ${hands
+          .map((entry) => {
+            const waitText = result.type === "ryukyoku"
+              ? entry.isTenpai
+                ? `テンパイ：${formatWinningTileNames(entry.winningTiles) || "-"}`
+                : "ノーテン"
+              : "";
+            return `
+              <article class="result-ryukyoku-player result-all-player-hand">
+                <div class="result-ryukyoku-player-title">
+                  ${escapeHtml(entry.displayName)}${waitText ? `　${escapeHtml(waitText)}` : ""}
+                </div>
+                <div class="result-ryukyoku-tile-row">
+                  ${(entry.handTiles || []).map((tile) => renderResultTile(tile)).join("")}
+                  ${entry.drawnTile ? renderResultTile(entry.drawnTile, "winning-tile") : ""}
+                  ${(entry.melds || []).map(renderMeld).join("")}
+                  ${(entry.flowerTiles || []).map((tile) => renderResultTile(tile)).join("")}
+                </div>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
   function renderRyukyokuHandsIfNeeded(result) {
     const hands = result.ryukyokuHands || [];
     if (!["draw", "ryukyoku"].includes(result.type) || hands.length === 0) return "";
@@ -3116,7 +3199,6 @@
                 ${renderResultHandTiles(win)}
                 ${renderResultMelds(win)}
                 ${renderResultFlowers(win)}
-                ${renderResultOpponentHands(win)}
               </article>
             `
           )
@@ -3132,7 +3214,7 @@
     els.battleResultBody.innerHTML = `
       <div class="result-simple">
         ${renderWinDetailIfNeeded(result)}
-        ${renderRyukyokuHandsIfNeeded(result)}
+        ${renderResultPlayerHandSnapshots(result)}
         ${renderSimpleBattleResultRows(result)}
       </div>
     `;
