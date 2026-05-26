@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>マーチャオサンマ</title>
-  <link rel="stylesheet" href="./styles.css?v=supabase-own-stats-v8" />
+  <link rel="stylesheet" href="./styles.css?v=supabase-ranking-v9" />
   </head>
   <body>
     <main class="app-shell">
@@ -161,6 +161,17 @@
                   <div class="stats-table-scroll" id="statsSummaryTable"></div>
                 </section>
                 <section class="stats-section">
+                  <div class="stats-section-heading">
+                    <h3>ランキング</h3>
+                    <label class="stats-ranking-control">
+                      <span>種別</span>
+                      <select id="statsRankingKindSelect" aria-label="ランキング種別"></select>
+                    </label>
+                  </div>
+                  <p class="stats-online-status" id="statsRankingStatus">読み込み前</p>
+                  <div class="stats-table-scroll" id="statsRankingTable"></div>
+                </section>
+                <section class="stats-section">
                   <h3>全半荘履歴</h3>
                   <div class="stats-table-scroll" id="statsHistoryTable"></div>
                   <div class="stats-pagination">
@@ -168,16 +179,6 @@
                     <span id="statsPageLabel">1 / 1</span>
                     <button class="mini-button stats-page-button" id="statsNextPageButton" type="button">次ページ</button>
                   </div>
-                </section>
-                <section class="stats-section">
-                  <h3>Supabase 自分の成績</h3>
-                  <p class="stats-online-status" id="statsSupabaseStatus">読み込み前</p>
-                  <div class="stats-table-scroll" id="statsSupabaseTable"></div>
-                </section>
-                <section class="stats-section">
-                  <h3>ランキング</h3>
-                  <p class="stats-online-status" id="statsRankingStatus">読み込み前</p>
-                  <div class="stats-table-scroll" id="statsRankingTable"></div>
                 </section>
               </div>
               <div class="stats-reset-area">
@@ -523,7 +524,7 @@
     <script src="./rules.js?v=settlement-chip-score-v1"></script>
     <script src="./hand-evaluation.js?v=general-yaku-v1"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./supabaseClient.js?v=supabase-own-stats-v8"></script>
-    <script src="./app.js?v=supabase-own-stats-v8"></script>
+    <script src="./supabaseClient.js?v=supabase-ranking-v9"></script>
+    <script src="./app.js?v=supabase-ranking-v9"></script>
   </body>
 </html>
