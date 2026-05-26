@@ -3268,8 +3268,8 @@
   }
 
   function currentSeatWind(playerIndex, dealerIndex) {
-    const winds = ["東家", "南家", "西家"];
-    return winds[(playerIndex - dealerIndex + 3) % 3] || "西家";
+    const winds = ["\u6771", "\u5357", "\u897f"];
+    return winds[(playerIndex - dealerIndex + 3) % 3] || "\u897f";
   }
 
   function playerDisplaySeat(player, index) {
@@ -3285,18 +3285,18 @@
   }
 
   function formatDisplayPoints(points) {
-    return String(Math.round((Number(points) || 0) / 100));
+    return String(Math.round(Number(points) || 0));
   }
 
   function formatDisplayChipPoints(chipPoints) {
     const value = Math.round((Number(chipPoints) || 0) / 500);
-    if (value > 0) return `+${value}`;
-    if (value < 0) return String(value);
-    return "0";
+    if (value > 0) return `+${value}pt`;
+    if (value < 0) return `${value}pt`;
+    return "0pt";
   }
 
-  function formatScoreDisplay(points, chipPoints) {
-    return `${formatDisplayPoints(points)}  ${formatDisplayChipPoints(chipPoints)}`;
+  function formatScoreDisplay(wind, points, chipPoints) {
+    return `${wind} ${formatDisplayPoints(points)} ${formatDisplayChipPoints(chipPoints)}`;
   }
 
   function renderCenterScoreDisplay(players = [], dealerIndex = null) {
@@ -3308,7 +3308,8 @@
       .map((seat) => {
         const entry = bySeat[seat];
         const player = entry?.player;
-        const text = formatScoreDisplay(playerDisplayPoints(player), playerDisplayChipPoints(player));
+        const wind = Number.isInteger(entry?.index) ? currentSeatWind(entry.index, dealerIndex) : "";
+        const text = formatScoreDisplay(wind, playerDisplayPoints(player), playerDisplayChipPoints(player));
         const isDealer = player?.isDealer || entry?.index === dealerIndex;
         const classes = ["score-display", `${seat}-score`, isDealer ? "is-dealer" : ""].filter(Boolean).join(" ");
         return `<div class="${classes}">${escapeHtml(text)}</div>`;
@@ -4353,6 +4354,11 @@
     if (seat === "shimocha") {
       const row = 6 - (index % 6);
       const column = Math.floor(index / 6) + 1;
+      return `style="grid-row:${row};grid-column:${column};"`;
+    }
+    if (seat === "kamicha") {
+      const row = (index % 6) + 1;
+      const column = 4 - Math.floor(index / 6);
       return `style="grid-row:${row};grid-column:${column};"`;
     }
     return "";
