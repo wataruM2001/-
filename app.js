@@ -84,6 +84,7 @@
   let lastBattleEffectSignature = "";
   let settlementBreakdownVisible = false;
   let resultTransparent = false;
+  let lastLandscapeBlankTapTime = 0;
   let paifuReplay = null;
   let paifuHandIndex = 0;
   let paifuStepIndex = 0;
@@ -395,6 +396,7 @@
       handleHumanDiscard(tileImage.dataset.discardTileId);
     });
     document.addEventListener("contextmenu", handleContextMenuTsumogiri);
+    els.battleSurface?.addEventListener("pointerup", handleLandscapeBlankDoubleTap);
     window.addEventListener("resize", () => {
       if (appScreen === "result") updateResultPanelBounds();
     });
@@ -699,9 +701,7 @@
     handleHumanDiscard(drawnTile.id);
   }
 
-  function handleContextMenuTsumogiri(event) {
-    if (appScreen !== "playing") return;
-    event.preventDefault();
+  function runRightClickEquivalentAction() {
     if (!battleState) return;
     if (isSelfPonOrKanActionPending()) {
       handleBattleAction("skip");
@@ -710,6 +710,66 @@
     if (battleState.phase === "actionPending" && !Game.canDiscardDuringActionPending?.(battleState)) return;
     if (battleState.phase !== "discard" && battleState.phase !== "actionPending") return;
     discardDrawnTileAsTsumogiri();
+  }
+
+  function handleContextMenuTsumogiri(event) {
+    if (appScreen !== "playing") return;
+    event.preventDefault();
+    runRightClickEquivalentAction();
+  }
+
+  function isSmartphoneLandscapeViewport() {
+    return window.matchMedia?.("(max-width: 950px) and (max-height: 520px) and (orientation: landscape)")?.matches;
+  }
+
+  function isLandscapeBlankTapTarget(target) {
+    if (!target || !els.battleSurface?.contains(target)) return false;
+    return !target.closest(
+      [
+        ".table-tile-img",
+        ".tile",
+        "button",
+        "input",
+        "select",
+        "textarea",
+        "a",
+        ".center-tableau",
+        ".center-table-layout",
+        ".dora-indicator-row",
+        ".discard-river",
+        ".self-hand",
+        ".self-hand-area",
+        ".opponent-hand",
+        ".meld-area",
+        ".self-meld-lane",
+        ".side-meld-lane",
+        ".self-flower-lane",
+        ".side-flower-lane",
+        ".battle-action-buttons",
+        ".battle-result-panel",
+        ".battle-settlement-panel",
+        ".paifu-panel",
+        ".rules-screen",
+        ".stats-screen",
+      ].join(", ")
+    );
+  }
+
+  function handleLandscapeBlankDoubleTap(event) {
+    if (appScreen !== "playing" || !isSmartphoneLandscapeViewport()) return;
+    if (event.pointerType && event.pointerType !== "touch") return;
+    if (!isLandscapeBlankTapTarget(event.target)) {
+      lastLandscapeBlankTapTime = 0;
+      return;
+    }
+    const now = Date.now();
+    if (now - lastLandscapeBlankTapTime <= 300) {
+      event.preventDefault();
+      runRightClickEquivalentAction();
+      lastLandscapeBlankTapTime = 0;
+      return;
+    }
+    lastLandscapeBlankTapTime = now;
   }
 
   function isSelfPendingAction() {
