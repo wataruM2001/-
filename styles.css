@@ -1282,6 +1282,10 @@ button {
   min-width: 0;
 }
 
+.result-ryukyoku-status-list .result-ryukyoku-tile-row {
+  display: none;
+}
+
 .result-ryukyoku-tile-row .meld-group {
   margin-left: 8px;
 }
