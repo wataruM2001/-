@@ -338,7 +338,7 @@
       return { ok: true, data: data || [] };
     },
 
-    async loadRankingSummary(limit = 50) {
+    async loadRankingSummary(limit = 500) {
       const client = getSupabaseClient();
       if (!client) return unavailableResult("loadRankingSummary");
       const userResult = await ensureSupabaseUser();
@@ -346,13 +346,13 @@
       if (userResult.user?.id) {
         await ensureUserProfile(userResult.user);
       }
-      const safeLimit = Math.max(1, Math.min(100, Math.floor(Number(limit) || 50)));
+      const safeLimit = Math.max(1, Math.min(500, Math.floor(Number(limit) || 500)));
       const rpcResult = await client.rpc("get_hanchan_ranking_summary", { limit_count: safeLimit });
       if (!rpcResult.error) return { ok: true, data: rpcResult.data || [] };
 
       const { data, error } = await client
         .from("hanchan_ranking_summary")
-        .select("display_name,hanchan_count,total_settlement_point,average_settlement_point,average_rank,total_chip_count,win_rate,deal_in_rate,riichi_rate,called_rate,average_duration_seconds")
+        .select("display_name,hanchan_count,total_settlement_point,average_settlement_point,average_rank,total_chip_count,total_hands,round_profit,win_rate,deal_in_rate,riichi_rate,called_rate,average_duration_seconds")
         .order("total_settlement_point", { ascending: false })
         .limit(safeLimit);
 
