@@ -4553,7 +4553,16 @@
     return chunks;
   }
 
-  function renderDiscardTileSlot(player, discard) {
+  function riverTileGridStyleForSeat(seat, index) {
+    if (seat === "kamicha") {
+      const row = (index % 6) + 1;
+      const column = 4 - Math.floor(index / 6);
+      return `style="grid-row:${row};grid-column:${column};"`;
+    }
+    return "";
+  }
+
+  function renderDiscardTileSlot(player, discard, extraAttributes = "") {
     const tile = discardTileOf(discard);
     if (!tile) return "";
     const seat = player?.seat || "self";
@@ -4575,7 +4584,8 @@
     ]
       .filter(Boolean)
       .join(" ");
-    return `<span class="${slotClasses}">${renderBattleTile(tile, tileClasses)}</span>`;
+    const attributes = extraAttributes ? ` ${extraAttributes}` : "";
+    return `<span class="${slotClasses}"${attributes}>${renderBattleTile(tile, tileClasses)}</span>`;
   }
 
   function renderDiscardRiver(player) {
@@ -4585,6 +4595,11 @@
     if (seat === "self") {
       return groups
         .map((row) => `<div class="river-line river-line-self">${row.map((discard) => renderDiscardTileSlot(player, discard)).join("")}</div>`)
+        .join("");
+    }
+    if (seat === "kamicha") {
+      return discards
+        .map((discard, index) => renderDiscardTileSlot(player, discard, riverTileGridStyleForSeat(seat, index)))
         .join("");
     }
     const columnClass = seat === "kamicha" ? "river-column-kamicha" : "river-column-shimocha";
