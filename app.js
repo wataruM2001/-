@@ -110,10 +110,22 @@
   let isViewingSharedPaifu = false;
   let currentSharedPaifuUrl = "";
   let isSettlementPreview = false;
+  let authSession = null;
+  let authUser = null;
+  let authMessageText = "";
+  let authMessageIsError = false;
+  let authSubscription = null;
 
   const els = {
     undoButton: document.getElementById("undoButton"),
     resetButton: document.getElementById("resetButton"),
+    authPanel: document.getElementById("authPanel"),
+    authStatus: document.getElementById("authStatus"),
+    authForm: document.getElementById("authForm"),
+    authEmailInput: document.getElementById("authEmailInput"),
+    authLoginButton: document.getElementById("authLoginButton"),
+    authLogoutButton: document.getElementById("authLogoutButton"),
+    authMessage: document.getElementById("authMessage"),
     battleTable: document.getElementById("battleTable"),
     battleSurface: document.querySelector(".battle-surface"),
     battleEffect: document.getElementById("battleEffect"),
@@ -248,6 +260,7 @@
   function init() {
     renderTileGroups();
     bindEvents();
+    initializeAuth();
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("preview") === "settlement") {
       setupSettlementPreview();
@@ -340,6 +353,107 @@
         kyotakuRecovery: 0,
       },
     ];
+  }
+
+  async function initializeAuth() {
+    renderAuthPanel();
+    const api = window.authApi;
+    if (!api?.isConfigured?.()) {
+      authMessageText = "Supabase Auth未設定";
+      authMessageIsError = true;
+      renderAuthPanel();
+      return;
+    }
+    try {
+      const result = await api.getSession();
+      if (result?.ok) {
+        authSession = result.session || null;
+        authUser = result.user || authSession?.user || null;
+      }
+    } catch (error) {
+      authMessageText = "Auth状態を取得できませんでした";
+      authMessageIsError = true;
+    }
+    if (!authSubscription) {
+      authSubscription = api.onAuthStateChange?.((event, session) => {
+        authSession = session || null;
+        authUser = session?.user || null;
+        if (event === "SIGNED_IN") {
+          authMessageText = "ログインしました";
+          authMessageIsError = false;
+        } else if (event === "SIGNED_OUT") {
+          authMessageText = "ログアウトしました";
+          authMessageIsError = false;
+        }
+        renderAuthPanel();
+      }) || null;
+    }
+    renderAuthPanel();
+  }
+
+  function authUserEmail() {
+    return authUser?.email || authSession?.user?.email || "";
+  }
+
+  function renderAuthPanel() {
+    if (!els.authPanel) return;
+    const email = authUserEmail();
+    const isSignedIn = Boolean(email);
+    setTextIfChanged(els.authStatus, isSignedIn ? email : "未ログイン");
+    setHiddenIfChanged(els.authForm, isSignedIn);
+    setHiddenIfChanged(els.authLogoutButton, !isSignedIn);
+    if (els.authLoginButton) els.authLoginButton.disabled = false;
+    if (els.authEmailInput && !isSignedIn) els.authEmailInput.disabled = false;
+    if (els.authMessage) {
+      setTextIfChanged(els.authMessage, authMessageText);
+      els.authMessage.classList.toggle("is-error", Boolean(authMessageIsError));
+      setHiddenIfChanged(els.authMessage, !authMessageText);
+    }
+  }
+
+  async function handleAuthLogin() {
+    const api = window.authApi;
+    if (!api?.signInWithEmail) {
+      authMessageText = "Supabase Authを読み込めませんでした";
+      authMessageIsError = true;
+      renderAuthPanel();
+      return;
+    }
+    const email = els.authEmailInput?.value || "";
+    if (els.authLoginButton) els.authLoginButton.disabled = true;
+    if (els.authEmailInput) els.authEmailInput.disabled = true;
+    authMessageText = "ログインメールを送信中...";
+    authMessageIsError = false;
+    renderAuthPanel();
+    const result = await api.signInWithEmail(email);
+    if (result?.ok) {
+      authMessageText = "ログイン用メールを送信しました";
+      authMessageIsError = false;
+    } else {
+      authMessageText = result?.reason || "ログインメールを送信できませんでした";
+      authMessageIsError = true;
+    }
+    if (els.authLoginButton) els.authLoginButton.disabled = false;
+    if (els.authEmailInput) els.authEmailInput.disabled = false;
+    renderAuthPanel();
+  }
+
+  async function handleAuthLogout() {
+    const api = window.authApi;
+    if (!api?.signOut) return;
+    if (els.authLogoutButton) els.authLogoutButton.disabled = true;
+    const result = await api.signOut();
+    if (!result?.ok) {
+      authMessageText = result?.reason || "ログアウトできませんでした";
+      authMessageIsError = true;
+    } else {
+      authSession = null;
+      authUser = null;
+      authMessageText = "ログアウトしました";
+      authMessageIsError = false;
+    }
+    if (els.authLogoutButton) els.authLogoutButton.disabled = false;
+    renderAuthPanel();
   }
 
   function resetBattleEffectState() {
@@ -619,6 +733,13 @@
       statsHistoryPage = 1;
       statsResetConfirmVisible = false;
       renderStatsScreen();
+    });
+    els.authForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      handleAuthLogin();
+    });
+    els.authLogoutButton?.addEventListener("click", () => {
+      handleAuthLogout();
     });
     els.battleConfirmButton?.addEventListener("click", () => {
       handleBattleResultConfirm();
