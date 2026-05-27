@@ -113,6 +113,7 @@
       riichiDeclaration: gameState.riichiDeclaration ? { ...gameState.riichiDeclaration } : null,
       pendingRiichi: gameState.pendingRiichi ? { ...gameState.pendingRiichi } : null,
       ponDiscardRestriction: gameState.ponDiscardRestriction ? { ...gameState.ponDiscardRestriction } : null,
+      forcedCpuDiscard: gameState.forcedCpuDiscard ? { ...gameState.forcedCpuDiscard } : null,
       paoState: gameState.paoState ? { ...gameState.paoState } : null,
     };
   }
@@ -737,6 +738,106 @@
     });
   }
 
+  function allShapeTiles(player) {
+    return [
+      ...cloneTiles(player?.hand || []),
+      ...meldTiles(player),
+    ];
+  }
+
+  function allShapeTilesAreTanyao(player) {
+    const tiles = allShapeTiles(player);
+    return tiles.length > 0 && tiles.every(isTanyaoTile);
+  }
+
+  function allShapeTilesAreSuitOrHonor(player, suit) {
+    const tiles = allShapeTiles(player);
+    return tiles.length > 0 && tiles.every((tile) => {
+      const tileSuitName = tileSuit(tile);
+      return tileSuitName === suit || tileSuitName === "honor";
+    });
+  }
+
+  function doraHanInCpuShape(player, gameState) {
+    const evaluator = HandEval();
+    const dora = evaluator?.calculateDoraHan?.(
+      [...allShapeTiles(player), ...cloneTiles(player?.flowers || [])],
+      gameState?.doraIndicators || [],
+      [],
+      { includeUraDora: false }
+    );
+    return Number(dora?.totalHan) || 0;
+  }
+
+  function hasYakuhaiCompletedMeld(player, gameState) {
+    const playerIndex = playerIndexForAcceptance(player, gameState);
+    return (player?.melds || []).some((meld) =>
+      ["pon", "minkan", "ankan", "kakan"].includes(meld?.type) &&
+      isYakuhaiBaseId(meld.baseId || tileBaseId(meld.tiles?.[0]), gameState, playerIndex)
+    );
+  }
+
+  function hasPairAfterRemovingCompletedMelds(tiles = []) {
+    function walk(counts) {
+      let triedRemoval = false;
+      const baseIds = sortedCountBaseIds(counts);
+      for (const baseId of baseIds) {
+        if ((counts.get(baseId) || 0) >= 3) {
+          triedRemoval = true;
+          addCount(counts, baseId, -3);
+          if (walk(counts)) {
+            addCount(counts, baseId, 3);
+            return true;
+          }
+          addCount(counts, baseId, 3);
+        }
+        const sequence = canMakeSequenceFrom(baseId, counts);
+        if (sequence) {
+          triedRemoval = true;
+          sequence.forEach((sequenceBaseId) => addCount(counts, sequenceBaseId, -1));
+          if (walk(counts)) {
+            sequence.forEach((sequenceBaseId) => addCount(counts, sequenceBaseId, 1));
+            return true;
+          }
+          sequence.forEach((sequenceBaseId) => addCount(counts, sequenceBaseId, 1));
+        }
+      }
+      return !triedRemoval && [...counts.values()].some((count) => count >= 2);
+    }
+    return walk(countByBaseId(tiles));
+  }
+
+  function everyAcceptanceTileHasYakuWithoutRiichi(player, gameState, acceptanceTiles) {
+    const evaluator = HandEval();
+    if (!evaluator?.evaluateWinningHand || !acceptanceTiles?.length) return false;
+    const playerIndex = playerIndexForAcceptance(player, gameState);
+    return acceptanceTiles.every((winningTile) => {
+      const tile = cloneTile(winningTile);
+      const result = evaluator.evaluateWinningHand([...cloneTiles(player?.hand || []), tile], tile, {
+        allWinTiles: [
+          ...cloneTiles(player?.hand || []),
+          tile,
+          ...cloneTiles(player?.flowers || []),
+          ...meldTiles(player),
+        ],
+        fixedMelds: player?.melds || [],
+        isTsumo: false,
+        isMenzen: isMenzen(player),
+        isRiichi: false,
+        isDoubleRiichi: false,
+        isIppatsu: false,
+        isChankan: false,
+        isHaitei: false,
+        isHoutei: false,
+        roundWind: gameState?.roundWind,
+        seatWind: seatWindForIndex(gameState, playerIndex),
+        doraIndicators: [],
+        uraDoraIndicators: [],
+      });
+      return Boolean(result?.best);
+    });
+  }
+
   function cpuRiichiOptionMatchesNewCriteria(player, gameState, option) {
     const discardTile = (player?.hand || []).find((tile) => tile.id === option?.tileId);
     if (!discardTile) return false;
@@ -1220,6 +1321,155 @@
     return chooseStandardCpuDiscard(player, gameState, random);
   }
 
+  function buildCpuPonVirtualPlayer(player, gameState, playerIndex, discardTile) {
+    const baseId = tileBaseId(discardTile);
+    const handTiles = sameBaseTiles(player.hand, baseId).slice(0, 2);
+    const calledFromIndex = gameState?.lastAction?.playerIndex;
+    const calledTile = cloneTile(discardTile);
+    const calledFromSeat = calledFromSeatFor(playerIndex, calledFromIndex);
+    return {
+      ...player,
+      hand: removeTilesById(player.hand, handTiles),
+      melds: [
+        ...(player.melds || []).map(cloneMeld).filter(Boolean),
+        {
+          id: `cpu_pon_${baseId}`,
+          type: "pon",
+          baseId,
+          tiles: calledFromSeat === "kamicha" ? [calledTile, ...handTiles] : [...handTiles, calledTile],
+          calledTile,
+          calledFrom: gameState?.players?.[calledFromIndex]?.id,
+          calledFromSeat,
+          fromPlayerIndex: calledFromIndex,
+        },
+      ],
+    };
+  }
+
+  function cpuPonVirtualState(gameState, playerIndex, virtualPlayer, calledBaseId) {
+    return {
+      ...gameState,
+      players: (gameState?.players || []).map((player, index) => index === playerIndex ? virtualPlayer : player),
+      ponDiscardRestriction: {
+        playerId: virtualPlayer.id,
+        playerIndex,
+        baseTileId: calledBaseId,
+      },
+    };
+  }
+
+  function cpuPonEntryMatchesConditions(entry, beforeAcceptanceCount, gameState) {
+    const { afterDiscard, shanten, acceptance, acceptanceTiles } = entry;
+    if (
+      shanten === 1 &&
+      allShapeTilesAreTanyao(afterDiscard) &&
+      doraHanInCpuShape(afterDiscard, gameState) >= 3 &&
+      acceptance >= 7
+    ) {
+      return true;
+    }
+    if (shanten === 1 && allShapeTilesAreSuitOrHonor(afterDiscard, "pin") && acceptance >= 7) {
+      return true;
+    }
+    if (shanten === 1 && allShapeTilesAreSuitOrHonor(afterDiscard, "sou") && acceptance >= 7) {
+      return true;
+    }
+    if (
+      shanten === 1 &&
+      hasYakuhaiCompletedMeld(afterDiscard, gameState) &&
+      hasPairAfterRemovingCompletedMelds(afterDiscard.hand) &&
+      acceptance >= 7
+    ) {
+      return true;
+    }
+    return (
+      beforeAcceptanceCount <= 14 &&
+      shanten === 0 &&
+      acceptance >= 3 &&
+      everyAcceptanceTileHasYakuWithoutRiichi(afterDiscard, gameState, acceptanceTiles)
+    );
+  }
+
+  function chooseCpuPonReaction(player, playerIndex, gameState, discardTile, random = Math.random) {
+    if (!player?.isCpu || !canPon(player, discardTile)) return null;
+    const beforeShanten = estimateShanten(player);
+    const beforeAcceptanceCount = acceptanceTilesForPlayerState(player, gameState).length;
+    const calledBaseId = tileBaseId(discardTile);
+    const virtualPlayer = buildCpuPonVirtualPlayer(player, gameState, playerIndex, discardTile);
+    const virtualState = cpuPonVirtualState(gameState, playerIndex, virtualPlayer, calledBaseId);
+    const candidates = discardCandidatesForPlayer(virtualPlayer, virtualState);
+    const entries = candidates.map((tile) => {
+      const afterDiscard = playerAfterDiscard(virtualPlayer, tile);
+      const acceptanceTiles = acceptanceTilesForPlayerState(afterDiscard, virtualState);
+      return {
+        tile,
+        afterDiscard,
+        shanten: estimateShanten(afterDiscard),
+        acceptance: acceptanceTiles.length,
+        acceptanceTiles,
+        edgePriority: edgeDiscardPriority(tile),
+        doraPriority: doraDiscardPriority(tile, virtualState),
+        tieBreaker: random(),
+      };
+    }).filter((entry) => entry.shanten === beforeShanten - 1);
+    const matched = entries.filter((entry) =>
+      cpuPonEntryMatchesConditions(entry, beforeAcceptanceCount, virtualState)
+    );
+    if (matched.length === 0) return null;
+    matched.sort((left, right) => {
+      if (left.shanten !== right.shanten) return left.shanten - right.shanten;
+      if (left.acceptance !== right.acceptance) return right.acceptance - left.acceptance;
+      if (left.edgePriority !== right.edgePriority) return left.edgePriority - right.edgePriority;
+      if (left.doraPriority !== right.doraPriority) return left.doraPriority - right.doraPriority;
+      return left.tieBreaker - right.tieBreaker;
+    });
+    const selectedTile = preferRedFiveDiscard(matched[0].tile, virtualPlayer, virtualState);
+    return { discardTileId: selectedTile?.id || matched[0].tile.id };
+  }
+
+  function playerAfterKakanCandidate(player, candidate) {
+    const tile = candidate?.tiles?.[0];
+    return {
+      ...player,
+      hand: removeTilesById(player?.hand || [], tile ? [tile] : []),
+      melds: (player?.melds || []).map((meld) => {
+        if (meld.id !== candidate?.meldId) return cloneMeld(meld);
+        return {
+          ...cloneMeld(meld),
+          type: "kakan",
+          tiles: [...cloneTiles(meld.tiles || []), cloneTile(tile)],
+          addedTile: cloneTile(tile),
+        };
+      }).filter(Boolean),
+    };
+  }
+
+  function chooseCpuKakanCandidate(player, gameState, random = Math.random) {
+    if (!player?.isCpu || player.isRiichi) return null;
+    const kamicha = kamichaEntryFor(player, gameState)?.player;
+    const shimocha = shimochaEntryFor(player, gameState)?.player;
+    if (kamicha?.isRiichi || shimocha?.isRiichi) return null;
+    const candidates = getKakanCandidates(player, gameState);
+    const matched = candidates.map((candidate) => {
+      const afterKan = playerAfterKakanCandidate(player, candidate);
+      const acceptance = acceptanceTilesForPlayerState(afterKan, gameState).length;
+      return {
+        candidate,
+        shanten: estimateShanten(afterKan),
+        acceptance,
+        tieBreaker: random(),
+      };
+    }).filter((entry) =>
+      (entry.shanten === 0 && entry.acceptance >= 4) ||
+      (entry.shanten === 1 && entry.acceptance >= 15)
+    );
+    return matched.sort((left, right) => {
+      if (left.shanten !== right.shanten) return left.shanten - right.shanten;
+      if (left.acceptance !== right.acceptance) return right.acceptance - left.acceptance;
+      return left.tieBreaker - right.tieBreaker;
+    })[0]?.candidate || null;
+  }
+
   function preferRedFiveDiscard(tile, player, gameState) {
     const baseId = tileBaseId(tile);
     if (!["p5", "s5"].includes(baseId) || tile?.color === "red") return tile;
@@ -1231,6 +1481,11 @@
 
   function chooseCpuDiscard(player, gameState, random = Math.random) {
     if (!player || player.hand.length === 0) return null;
+    const forced = gameState?.forcedCpuDiscard;
+    if (forced?.playerId === player.id) {
+      const forcedTile = discardCandidatesForPlayer(player, gameState).find((tile) => tile.id === forced.tileId);
+      if (forcedTile) return forcedTile;
+    }
     let selected = null;
     if (shouldUseUltraSpecialCpuMode(player, gameState)) {
       selected = chooseUltraSpecialCpuDiscard(player, gameState, random);
@@ -1323,12 +1578,12 @@
   }
 
   function canPon(player, discardTile) {
-    if (!player || player.isCpu || player.isRiichi || !discardTile) return false;
+    if (!player || player.isRiichi || !discardTile) return false;
     return sameBaseTiles(player.hand, tileBaseId(discardTile)).length >= 2;
   }
 
   function getAnkanCandidates(player, gameState) {
-    if (!player || player.isCpu || Number(gameState?.remainingDraws) <= 1) return [];
+    if (!player || Number(gameState?.remainingDraws) <= 1) return [];
     const counts = new Map();
     cloneTiles(player.hand).forEach((tile) => {
       const baseId = tileBaseId(tile);
@@ -1354,7 +1609,7 @@
   }
 
   function getKakanCandidates(player, gameState) {
-    if (!player || player.isCpu || player.isRiichi || Number(gameState?.remainingDraws) <= 1) return [];
+    if (!player || player.isRiichi || Number(gameState?.remainingDraws) <= 1) return [];
     return (player.melds || [])
       .filter((meld) => meld.type === "pon")
       .map((meld) => {
@@ -1366,7 +1621,7 @@
   }
 
   function getKanCandidates(player, gameState) {
-    if (!player || player.isCpu || Number(gameState?.remainingDraws) <= 1) return [];
+    if (!player || Number(gameState?.remainingDraws) <= 1) return [];
     if (player.isRiichi) return getRiichiAnkanCandidates(player, gameState);
     if (gameState?.pendingAction?.source === "afterDiscard") return getMinkanCandidates(player, gameState);
     return [...getAnkanCandidates(player, gameState), ...getKakanCandidates(player, gameState)];
@@ -1405,7 +1660,7 @@
   }
 
   function getRiichiAnkanCandidates(player, gameState) {
-    if (!player?.isRiichi || player.isCpu || Number(gameState?.remainingDraws) <= 1) return [];
+    if (!player?.isRiichi || Number(gameState?.remainingDraws) <= 1) return [];
     const riichiWaits = player.riichiWinningTiles || [];
     return getAnkanCandidates({ ...player, isRiichi: false }, gameState).filter((candidate) => {
       const afterKanHand = cloneTiles(player.hand).filter(
@@ -1713,6 +1968,7 @@
     player.hasDiscardedThisHand = true;
     player.isDoubleRiichiEligible = false;
     next.ponDiscardRestriction = null;
+    next.forcedCpuDiscard = null;
     if (isRiichiMarkerReplacement) {
       player.needsRiichiMarkerOnNextDiscard = false;
     }
@@ -1875,7 +2131,7 @@
     return commitRiichiIfPending(gameState);
   }
 
-  function callPon(gameState, playerIndex, discardTile = gameState.pendingAction?.discardTile) {
+  function callPon(gameState, playerIndex, discardTile = gameState.pendingAction?.discardTile, forcedDiscardTileId = "") {
     const next = commitRiichiBeforeCallIfNeeded(gameState);
     const player = next.players[playerIndex];
     const discarder = next.players[next.lastAction?.playerIndex];
@@ -1913,6 +2169,13 @@
       playerIndex,
       baseTileId: baseId,
     };
+    next.forcedCpuDiscard = player.isCpu && forcedDiscardTileId
+      ? {
+          playerId: player.id,
+          playerIndex,
+          tileId: forcedDiscardTileId,
+        }
+      : null;
     next.phase = "discard";
     next.lastAction = {
       type: "pon",
@@ -2296,6 +2559,11 @@
     }
     const candidates = getRiichiAnkanCandidates(player, gameState);
     if (candidates.length > 0) {
+      if (player.isCpu) {
+        const afterKan = callKan(gameState, playerIndex, candidates[0]);
+        if (afterKan.phase === "result") return afterKan;
+        return handleRiichiDraw(afterKan.players[playerIndex], afterKan);
+      }
       return setPendingAction(gameState, {
         playerId: player.id,
         playerIndex,
@@ -2320,6 +2588,11 @@
     if (player.isCpu) {
       if (canTsumo(player, next)) {
         return resolveWin(next, { winType: "tsumo", winnerIndex: next.currentPlayerIndex });
+      }
+      const cpuKakan = chooseCpuKakanCandidate(player, next);
+      if (cpuKakan) {
+        const afterKan = callKan(next, next.currentPlayerIndex, cpuKakan);
+        return afterKan.phase === "result" ? afterKan : afterPlayerDraw(afterKan);
       }
       const cpuOptions = cpuRiichiOptions(player, next);
       if (cpuOptions.length > 0) {
@@ -2400,6 +2673,19 @@
         winnerIndex: cpuRon.playerIndex,
         discarderIndex,
       });
+    }
+
+    const cpuPon = reactionPlayers
+      .filter(({ player }) => player.isCpu)
+      .map(({ player, playerIndex }) => ({
+        player,
+        playerIndex,
+        decision: chooseCpuPonReaction(player, playerIndex, next, discardTile),
+      }))
+      .find(({ decision }) => Boolean(decision));
+    if (cpuPon) {
+      next = commitRiichiIfPending(next);
+      return callPon(next, cpuPon.playerIndex, discardTile, cpuPon.decision.discardTileId);
     }
 
     next = commitRiichiIfPending(next);
@@ -2563,6 +2849,8 @@
     shouldUseSpecialCpuMode,
     isDangerousPlayer,
     countCompletedMeldsForCpu,
+    chooseCpuPonReaction,
+    chooseCpuKakanCandidate,
     chooseStandardCpuDiscard,
     chooseUltraSpecialCpuDiscard,
     chooseSpecialCpuDiscard,
