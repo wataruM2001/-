@@ -646,6 +646,27 @@
     ];
   }
 
+  function playerIndexForAcceptance(player, gameState) {
+    const players = gameState?.players || [];
+    const directIndex = players.indexOf(player);
+    if (directIndex >= 0) return directIndex;
+    return players.findIndex((entry) => entry?.id && player?.id && entry.id === player.id);
+  }
+
+  function acceptanceSourceTilesForPlayer(player, gameState) {
+    const playerIndex = playerIndexForAcceptance(player, gameState);
+    const otherPlayersHandTiles = (gameState?.players || []).flatMap((entry, index) => {
+      if (index === playerIndex) return [];
+      if (playerIndex < 0 && entry?.id && player?.id && entry.id === player.id) return [];
+      return cloneTiles(entry?.hand || []);
+    });
+    return [
+      ...drawableAndRinshanTiles(gameState),
+      ...otherPlayersHandTiles,
+      ...cloneTiles(gameState?.uraDoraIndicators || []),
+    ];
+  }
+
   function countWinningTilesInDrawableAndRinshanTiles(playerOrWinningTileBaseIds, gameState) {
     const winningTileBaseIds = Array.isArray(playerOrWinningTileBaseIds)
       ? playerOrWinningTileBaseIds
@@ -715,12 +736,12 @@
   function countAcceptanceTilesAfterDiscard(player, discardTile, gameState) {
     const afterDiscard = playerAfterDiscard(player, discardTile);
     const shantenAfterDiscard = estimateShanten(afterDiscard);
-    return drawableAndRinshanTiles(gameState).filter((drawTileCandidate) => {
+    return acceptanceSourceTilesForPlayer(player, gameState).filter((drawTileCandidate) => {
       const afterDraw = {
         ...afterDiscard,
         hand: [...cloneTiles(afterDiscard.hand), cloneTile(drawTileCandidate)],
       };
-      return estimateShanten(afterDraw) <= shantenAfterDiscard - 1;
+      return estimateShanten(afterDraw) === shantenAfterDiscard - 1;
     }).length;
   }
 
