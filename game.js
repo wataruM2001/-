@@ -1099,12 +1099,21 @@
     return chooseDefensiveDiscard(player, gameState, random);
   }
 
+  function preferRedFiveDiscard(tile, player, gameState) {
+    const baseId = tileBaseId(tile);
+    if (!["p5", "s5"].includes(baseId) || tile?.color === "red") return tile;
+    const redFive = discardCandidatesForPlayer(player, gameState).find(
+      (candidate) => tileBaseId(candidate) === baseId && candidate.color === "red"
+    );
+    return redFive || tile;
+  }
+
   function chooseCpuDiscard(player, gameState, random = Math.random) {
     if (!player || player.hand.length === 0) return null;
-    if (shouldUseSpecialCpuMode(player, gameState)) {
-      return chooseSpecialCpuDiscard(player, gameState, random);
-    }
-    return chooseStandardCpuDiscard(player, gameState, random);
+    const selected = shouldUseSpecialCpuMode(player, gameState)
+      ? chooseSpecialCpuDiscard(player, gameState, random)
+      : chooseStandardCpuDiscard(player, gameState, random);
+    return preferRedFiveDiscard(selected, player, gameState);
   }
 
   function canRon(player, discardTile, gameState) {
