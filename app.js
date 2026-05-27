@@ -11,7 +11,7 @@
   const EFFECT_SCREEN_MARGIN = 16;
   const EFFECT_PANEL_MARGIN = 16;
   const AUTO_DISCARD_DELAY_MS = 1300;
-  const CPU_DISCARD_DELAY_MS = AUTO_DISCARD_DELAY_MS;
+  const CPU_DISCARD_DELAY_MS = 1500;
   const RIICHI_AUTO_DISCARD_DELAY_MS = AUTO_DISCARD_DELAY_MS;
   const AFTER_DISCARD_REACTION_DELAY_MS = 50;
   const PAIFU_REPLAY_INTERVAL_MS = 1000;
@@ -94,6 +94,7 @@
   let lastHandResult = null;
   let battleSettlement = null;
   let cpuTurnTimer = 0;
+  let pendingCpuDiscard = null;
   let riichiAutoDiscardTimer = 0;
   let afterDiscardTimer = 0;
   let resultTransitionTimer = 0;
@@ -630,6 +631,7 @@
   function clearCpuTurnTimer() {
     window.clearTimeout(cpuTurnTimer);
     cpuTurnTimer = 0;
+    pendingCpuDiscard = null;
   }
 
   function clearRiichiAutoDiscardTimer() {
@@ -1440,7 +1442,29 @@
     if (!battleState || appScreen !== "playing" || battleState.phase !== "discard") return;
     const currentPlayer = battleState.players[battleState.currentPlayerIndex];
     if (!currentPlayer?.isCpu) return;
-    cpuTurnTimer = window.setTimeout(runCpuTurn, CPU_DISCARD_DELAY_MS);
+    const startedAt = performance.now();
+    pendingCpuDiscard = {
+      playerIndex: battleState.currentPlayerIndex,
+      playerId: currentPlayer.id,
+      stateId: battleState.hanchanId,
+      phase: battleState.phase,
+      tileId: null,
+      isRiichiAutoDiscard: Boolean(currentPlayer.isRiichi),
+      shouldEndRyukyoku: false,
+    };
+
+    if (!currentPlayer.isRiichi) {
+      const discard = Game.decideCpuDiscard(currentPlayer, battleState);
+      if (discard) {
+        pendingCpuDiscard.tileId = discard.id;
+      } else {
+        pendingCpuDiscard.shouldEndRyukyoku = true;
+      }
+    }
+
+    const elapsed = performance.now() - startedAt;
+    const waitMs = Math.max(0, CPU_DISCARD_DELAY_MS - elapsed);
+    cpuTurnTimer = window.setTimeout(runCpuTurn, waitMs);
   }
 
   function isSelfRiichiAutoDiscardTurn(gameState) {
@@ -1468,20 +1492,30 @@
     if (!battleState || appScreen !== "playing" || battleState.phase !== "discard") return;
     const currentPlayer = battleState.players[battleState.currentPlayerIndex];
     if (!currentPlayer?.isCpu) return;
-    if (currentPlayer.isRiichi) {
+    const pending = pendingCpuDiscard;
+    pendingCpuDiscard = null;
+    if (
+      !pending ||
+      pending.playerIndex !== battleState.currentPlayerIndex ||
+      pending.playerId !== currentPlayer.id ||
+      pending.stateId !== battleState.hanchanId ||
+      pending.phase !== battleState.phase
+    ) {
+      return;
+    }
+    if (pending.isRiichiAutoDiscard) {
       battleState = Game.handleRiichiDraw(currentPlayer, battleState);
       renderBattleStateAndScheduleNext();
       return;
     }
-    const discard = Game.decideCpuDiscard(currentPlayer, battleState);
-    if (!discard) {
+    if (pending.shouldEndRyukyoku || !pending.tileId) {
       battleState = Game.endHandAsRyukyoku(battleState);
       enterResultIfHandEnded();
       recordPaifuSnapshot(battleState, "ryukyoku", "流局");
       renderBattleTable();
       return;
     }
-    battleState = Game.discardTile(battleState, battleState.currentPlayerIndex, discard.id);
+    battleState = Game.discardTile(battleState, battleState.currentPlayerIndex, pending.tileId);
     renderBattleStateAndScheduleNext();
   }
 
