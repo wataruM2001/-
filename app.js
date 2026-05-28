@@ -18,6 +18,28 @@
   const PAIFU_STORAGE_KEY = "marchao-sanma-last-paifu-v1";
   const STATS_STORAGE_KEY = "marchaoSanmaStatsV1";
   const IN_PROGRESS_STORAGE_KEY = "marchaoSanmaInProgressV1";
+  const SOUND_FILES = {
+    startGame: "./sounds/button_decide.mp3",
+    discard: "./sounds/discard.mp3",
+    skipPrompt: "./sounds/button_cancel.mp3",
+    screenTransition: "./sounds/button_decide.mp3",
+    riichi: "./sounds/riichi.mp3",
+    pon: "./sounds/pon.mp3",
+    kan: "./sounds/kan.mp3",
+    tsumo: "./sounds/tsumo.mp3",
+    ron: "./sounds/ron.mp3",
+  };
+  const SOUND_VOLUME = {
+    startGame: 0.55,
+    discard: 0.45,
+    skipPrompt: 0.45,
+    screenTransition: 0.45,
+    riichi: 0.6,
+    pon: 0.6,
+    kan: 0.6,
+    tsumo: 0.65,
+    ron: 0.65,
+  };
   const STATS_HISTORY_PAGE_SIZE = 10;
   const STATS_RANKING_LIMIT = 10;
   const STATS_RANKING_METRICS = {
@@ -91,6 +113,10 @@
   let state = loadState();
   let battleState = null;
   let appScreen = "start";
+  let soundEnabled = false;
+  let lastSoundScreen = "start";
+  let suppressNextScreenTransitionSound = false;
+  let lastSkipPromptSoundSignature = "";
   let lastHandResult = null;
   let battleSettlement = null;
   let cpuTurnTimer = 0;
@@ -644,6 +670,96 @@
     afterDiscardTimer = 0;
   }
 
+  function enableSoundFromUserGesture() {
+    soundEnabled = true;
+  }
+
+  function playSound(name) {
+    if (!soundEnabled) return;
+    const src = SOUND_FILES[name];
+    if (!src) return;
+    try {
+      const audio = new Audio(src);
+      audio.volume = SOUND_VOLUME[name] ?? 0.5;
+      audio.play().catch(() => {});
+    } catch (error) {
+      console.warn("sound failed", name, error);
+    }
+  }
+
+  function soundNameForBattleEffect(effect) {
+    const classes = String(effect?.classes || "");
+    if (classes.includes("effect-riichi")) return "riichi";
+    if (classes.includes("effect-pon")) return "pon";
+    if (classes.includes("effect-kan")) return "kan";
+    if (classes.includes("effect-tsumo")) return "tsumo";
+    if (classes.includes("effect-ron")) return "ron";
+    return "";
+  }
+
+  function playBattleEffectSound(effect) {
+    const soundName = soundNameForBattleEffect(effect);
+    if (soundName) playSound(soundName);
+  }
+
+  function discardSoundSignature(gameState) {
+    const action = gameState?.lastAction;
+    if (action?.type !== "discard") return "";
+    return [
+      action.playerIndex ?? "",
+      action.tileId || "",
+      action.isTsumogiri ? "tsumogiri" : "hand",
+      action.isRiichiDeclaration ? "riichi" : "",
+      (gameState?.players?.[action.playerIndex]?.discards || []).length,
+    ].join(":");
+  }
+
+  function playDiscardSoundIfNew(previousGameState, nextGameState) {
+    const nextSignature = discardSoundSignature(nextGameState);
+    if (!nextSignature) return;
+    if (nextSignature === discardSoundSignature(previousGameState)) return;
+    playSound("discard");
+  }
+
+  function skipPromptSoundSignature(gameState) {
+    if (appScreen !== "playing" || gameState?.phase !== "actionPending") return "";
+    const pending = gameState.pendingAction;
+    if (!pending?.availableActions?.canSkip) return "";
+    const action = gameState.lastAction || {};
+    return [
+      pending.playerIndex ?? "",
+      pending.source || "",
+      action.type || "",
+      action.playerIndex ?? "",
+      action.tileId || "",
+      Object.entries(pending.availableActions || {})
+        .filter(([, enabled]) => Boolean(enabled))
+        .map(([key]) => key)
+        .sort()
+        .join("|"),
+    ].join(":");
+  }
+
+  function maybePlaySkipPromptSound(gameState) {
+    const signature = skipPromptSoundSignature(gameState);
+    if (!signature) {
+      lastSkipPromptSoundSignature = "";
+      return;
+    }
+    if (signature === lastSkipPromptSoundSignature) return;
+    lastSkipPromptSoundSignature = signature;
+    playSound("skipPrompt");
+  }
+
+  function maybePlayScreenTransitionSound() {
+    if (appScreen === lastSoundScreen) return;
+    const shouldSuppress = suppressNextScreenTransitionSound;
+    suppressNextScreenTransitionSound = false;
+    lastSoundScreen = appScreen;
+    if (shouldSuppress) return;
+    playSound("screenTransition");
+  }
+
   function clearPaifuReplayTimer() {
     window.clearInterval(paifuReplayTimer);
     paifuReplayTimer = 0;
@@ -823,6 +939,8 @@
   }
 
   function bindEvents() {
+    document.addEventListener("pointerdown", enableSoundFromUserGesture, { capture: true });
+    document.addEventListener("keydown", enableSoundFromUserGesture, { capture: true });
     els.battleStartButton?.addEventListener("click", () => {
       if (hasInProgressHanchanSave()) {
         appScreen = "resume";
@@ -1228,6 +1346,8 @@
     clearResultTransitionTimer();
     resetBattleEffectState();
     syncPlayersFromInputs();
+    playSound("startGame");
+    suppressNextScreenTransitionSound = true;
     appScreen = "playing";
     lastHandResult = null;
     battleSettlement = null;
@@ -1294,7 +1414,9 @@
     const selectedTile = currentPlayer?.hand?.find((tile) => tile.id === tileId);
     if (isDisabledBattleDiscardTile(selectedTile, battleState.currentPlayerIndex)) return;
     try {
+      const previousBattleState = battleState;
       battleState = Game.discardTile(battleState, battleState.currentPlayerIndex, tileId);
+      playDiscardSoundIfNew(previousBattleState, battleState);
       renderBattleStateAndScheduleNext();
     } catch (error) {
       els.battleStatus.textContent = error.message;
@@ -1400,6 +1522,7 @@
     try {
       const previousBattleState = battleState;
       battleState = Game.performPendingAction(battleState, action);
+      playDiscardSoundIfNew(previousBattleState, battleState);
       queueRiichiEffectIfJustFinalized(previousBattleState, battleState);
       renderBattleStateAndScheduleNext();
     } catch (error) {
@@ -1483,7 +1606,9 @@
     riichiAutoDiscardTimer = 0;
     if (!isSelfRiichiAutoDiscardTurn(battleState)) return;
     const currentPlayer = battleState.players[battleState.currentPlayerIndex];
+    const previousBattleState = battleState;
     battleState = Game.handleRiichiDraw(currentPlayer, battleState);
+    playDiscardSoundIfNew(previousBattleState, battleState);
     renderBattleStateAndScheduleNext();
   }
 
@@ -1504,7 +1629,9 @@
       return;
     }
     if (pending.isRiichiAutoDiscard) {
+      const previousBattleState = battleState;
       battleState = Game.handleRiichiDraw(currentPlayer, battleState);
+      playDiscardSoundIfNew(previousBattleState, battleState);
       renderBattleStateAndScheduleNext();
       return;
     }
@@ -1515,7 +1642,9 @@
       renderBattleTable();
       return;
     }
+    const previousBattleState = battleState;
     battleState = Game.discardTile(battleState, battleState.currentPlayerIndex, pending.tileId);
+    playDiscardSoundIfNew(previousBattleState, battleState);
     renderBattleStateAndScheduleNext();
   }
 
@@ -3951,6 +4080,7 @@
   }
 
   function renderBattleScreenPanels() {
+    maybePlayScreenTransitionSound();
     const isResult = appScreen === "result";
     const isSettlement = appScreen === "settlement";
     const isRules = appScreen === "rules";
@@ -4264,6 +4394,7 @@
     activeBattleEffect = battleEffectQueue.shift() || null;
     renderActiveBattleEffect();
     if (!activeBattleEffect) return;
+    playBattleEffectSound(activeBattleEffect);
     battleEffectTimer = window.setTimeout(() => {
       activeBattleEffect = null;
       renderActiveBattleEffect();
@@ -4885,6 +5016,7 @@
     renderCentralInfoPanel(paifuState);
     resetBattleEffectState();
     if (els.battleActionButtons) setHtmlIfChanged(els.battleActionButtons, "");
+    maybePlaySkipPromptSound(null);
     setTextIfChanged(els.battleStatus, snapshot.actionText || "牌譜再生中");
     setTextIfChanged(els.battleStartButton, "対局開始");
 
@@ -4941,6 +5073,7 @@
     if (els.battleActionButtons) {
       setHtmlIfChanged(els.battleActionButtons, renderBattleActionButtons(battleState));
     }
+    maybePlaySkipPromptSound(battleState);
     setTextIfChanged(els.battleStatus, battleStatusText());
     setTextIfChanged(els.battleStartButton, battleState.phase === "ryukyoku" ? "もう一局" : "対局開始");
 
@@ -5012,6 +5145,7 @@
     setHtmlIfChanged(els.battleDoraIndicators, "");
     renderBattleEffect(null);
     if (els.battleActionButtons) setHtmlIfChanged(els.battleActionButtons, "");
+    maybePlaySkipPromptSound(null);
     if (els.battlePlayerScores) setHtmlIfChanged(els.battlePlayerScores, renderCenterScoreDisplay(state.players, dealer));
     setHtmlIfChanged(els.battleFlowerTiles, "");
     setHtmlIfChanged(els.battleSelfRiver, "");
