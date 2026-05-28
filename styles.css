@@ -1715,6 +1715,8 @@ button {
 }
 
 .opponent-left .side-meld-lane {
+  --open-tile-width: calc((var(--hand-tile-width, clamp(23px, 5.2vw, 70px)) + var(--center-river-tile-width, clamp(28px, 3vw, 42px))) * 0.4);
+  --open-tile-height: calc(var(--open-tile-width) * 1.40625);
   position: static;
   grid-row: 2;
   align-self: end;
@@ -1725,6 +1727,8 @@ button {
 }
 
 .opponent-right .side-meld-lane {
+  --open-tile-width: calc((var(--hand-tile-width, clamp(23px, 5.2vw, 70px)) + var(--center-river-tile-width, clamp(28px, 3vw, 42px))) * 0.4);
+  --open-tile-height: calc(var(--open-tile-width) * 1.40625);
   position: static;
   grid-row: 1;
   align-self: start;
@@ -4068,6 +4072,8 @@ button:disabled:hover,
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left .side-meld-lane {
+    --open-tile-width: calc(var(--landscape-tile-width) * 0.8);
+    --open-tile-height: calc(var(--open-tile-width) * 1.40625);
     position: static;
     padding: 0;
     gap: 0;
@@ -4080,6 +4086,8 @@ button:disabled:hover,
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-meld-lane {
+    --open-tile-width: calc(var(--landscape-tile-width) * 0.8);
+    --open-tile-height: calc(var(--open-tile-width) * 1.40625);
     position: static;
     padding: 0;
     gap: 0;
