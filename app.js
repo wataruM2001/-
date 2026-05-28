@@ -4547,8 +4547,62 @@
     return `<span class="${slotClasses}">${renderMeldTileImage(tile, classes, useBack)}</span>`;
   }
 
-  function renderMeld(meld) {
+  function renderKamichaMeldTile(tile, orientation = "vertical", classes = "", useBack = false) {
+    const slotClasses = [
+      "meld-tile-slot",
+      orientation === "horizontal" ? "is-horizontal" : "is-vertical",
+      useBack ? "is-back" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return `<span class="${slotClasses}">${renderMeldTileImage(tile, classes, useBack)}</span>`;
+  }
+
+  function renderKamichaKakanPair(calledTile, addedTile) {
+    return `
+      <span class="kamicha-kakan-pair">
+        ${renderKamichaMeldTile(calledTile, "vertical", "called-tile")}
+        ${renderKamichaMeldTile(addedTile, "vertical", "added-kan-tile")}
+      </span>
+    `;
+  }
+
+  function renderKamichaMeld(meld) {
     if (!meld) return "";
+    if (meld.type === "ankan") {
+      const tiles = meldBaseTiles(meld);
+      return `
+        <div class="meld-group kamicha-meld ankan">
+          ${renderKamichaMeldTile(tiles[0], "horizontal", "", true)}
+          ${renderKamichaMeldTile(tiles[1], "horizontal")}
+          ${renderKamichaMeldTile(tiles[2], "horizontal")}
+          ${renderKamichaMeldTile(tiles[3], "horizontal", "", true)}
+        </div>
+      `;
+    }
+
+    const tiles = arrangeCalledMeldTiles(meld);
+    const calledIndex = calledTileIndexForMeld(meld, tiles);
+    return `
+      <div class="meld-group kamicha-meld ${escapeHtml(meld.type || "")}">
+        ${tiles
+          .map((tile, index) => {
+            const isCalled = index === calledIndex;
+            if (meld.type === "kakan" && isCalled && meld.addedTile) {
+              return renderKamichaKakanPair(tile, meld.addedTile);
+            }
+            return renderKamichaMeldTile(tile, isCalled ? "vertical" : "horizontal", isCalled ? "called-tile" : "");
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
+  function renderMeld(meld, seat = "") {
+    if (!meld) return "";
+    if (seat === "kamicha") {
+      return renderKamichaMeld(meld);
+    }
     if (meld.type === "ankan") {
       const tiles = meldBaseTiles(meld);
       return `
@@ -4584,7 +4638,7 @@
   }
 
   function renderPlayerMelds(player) {
-    return [...(player?.melds || [])].reverse().map(renderMeld).join("");
+    return [...(player?.melds || [])].reverse().map((meld) => renderMeld(meld, player?.seat)).join("");
   }
 
   function orderDiscardsForRiver(player) {
