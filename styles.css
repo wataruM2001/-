@@ -1903,6 +1903,23 @@ button {
   z-index: 2;
 }
 
+.meld-tile-slot.is-kakan-stack .called-tile-stack .kakan-stack-tile {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: var(--open-tile-width);
+  height: auto;
+  aspect-ratio: 128 / 180;
+  object-fit: contain;
+  transform: translateX(-50%) rotate(calc(var(--meld-seat-rotation) + 90deg));
+  transform-origin: center center;
+}
+
+.meld-tile-slot.is-kakan-stack .called-tile-stack .kakan-stack-tile.added-kan-tile {
+  bottom: var(--open-tile-width);
+  z-index: 2;
+}
+
 .self-flower-lane {
   --river-tile-width: clamp(22px, 2.7vw, 38px);
   position: absolute;
@@ -5040,4 +5057,21 @@ button:disabled:hover,
   .stats-table {
     min-width: 820px;
   }
+}
+
+.battle-surface:not(.is-start-screen) .meld-tile-slot.is-kakan-stack .called-tile-stack .table-tile-img.kakan-stack-tile {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: var(--open-tile-width);
+  height: auto;
+  aspect-ratio: 128 / 180;
+  object-fit: contain;
+  transform: translateX(-50%) rotate(calc(var(--meld-seat-rotation) + 90deg));
+  transform-origin: center center;
+}
+
+.battle-surface:not(.is-start-screen) .meld-tile-slot.is-kakan-stack .called-tile-stack .table-tile-img.kakan-stack-tile.added-kan-tile {
+  bottom: var(--open-tile-width);
+  z-index: 2;
 }
