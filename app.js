@@ -4529,6 +4529,26 @@
     return tiles;
   }
 
+  function arrangeShimochaCalledMeldTiles(meld) {
+    const tiles = meldBaseTiles(meld);
+    if (meld?.type === "ankan" || !meld?.calledTile) return tiles;
+    const calledTile = meld.calledTile;
+    const handTiles = tiles.filter((tile) => tile.id !== calledTile.id);
+    if (meld.calledFromSeat === "shimocha") return [calledTile, ...handTiles];
+    if (meld.calledFromSeat === "toimen") {
+      const middleIndex = Math.min(1, handTiles.length);
+      return [...handTiles.slice(0, middleIndex), calledTile, ...handTiles.slice(middleIndex)];
+    }
+    if (meld.calledFromSeat === "kamicha") return [...handTiles, calledTile];
+    return tiles;
+  }
+
+  function calledTileIndexInArrangedMeld(meld, tiles) {
+    if (!meld || meld.type === "ankan" || !meld.calledTile) return null;
+    const index = tiles.findIndex((tile) => tile.id === meld.calledTile.id);
+    return index >= 0 ? index : null;
+  }
+
   function renderMeldTileImage(tile, classes = "", useBack = false) {
     if (!tile && !useBack) return "";
     const src = useBack ? Tiles.tileImagePath("blue_back") : tile.image;
@@ -4598,10 +4618,64 @@
     `;
   }
 
+  function renderShimochaMeldTile(tile, orientation = "vertical", classes = "", useBack = false) {
+    const slotClasses = [
+      "meld-tile-slot",
+      orientation === "horizontal" ? "is-horizontal" : "is-vertical",
+      useBack ? "is-back" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return `<span class="${slotClasses}">${renderMeldTileImage(tile, classes, useBack)}</span>`;
+  }
+
+  function renderShimochaKakanPair(calledTile, addedTile) {
+    return `
+      <span class="shimocha-kakan-pair">
+        ${renderShimochaMeldTile(addedTile, "vertical", "added-kan-tile")}
+        ${renderShimochaMeldTile(calledTile, "vertical", "called-tile")}
+      </span>
+    `;
+  }
+
+  function renderShimochaMeld(meld) {
+    if (!meld) return "";
+    if (meld.type === "ankan") {
+      const tiles = meldBaseTiles(meld);
+      return `
+        <div class="meld-group shimocha-meld ankan">
+          ${renderShimochaMeldTile(tiles[0], "horizontal", "", true)}
+          ${renderShimochaMeldTile(tiles[1], "horizontal")}
+          ${renderShimochaMeldTile(tiles[2], "horizontal")}
+          ${renderShimochaMeldTile(tiles[3], "horizontal", "", true)}
+        </div>
+      `;
+    }
+
+    const tiles = arrangeShimochaCalledMeldTiles(meld);
+    const calledIndex = calledTileIndexInArrangedMeld(meld, tiles);
+    return `
+      <div class="meld-group shimocha-meld ${escapeHtml(meld.type || "")}">
+        ${tiles
+          .map((tile, index) => {
+            const isCalled = index === calledIndex;
+            if (meld.type === "kakan" && isCalled && meld.addedTile) {
+              return renderShimochaKakanPair(tile, meld.addedTile);
+            }
+            return renderShimochaMeldTile(tile, isCalled ? "vertical" : "horizontal", isCalled ? "called-tile" : "");
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
   function renderMeld(meld, seat = "") {
     if (!meld) return "";
     if (seat === "kamicha") {
       return renderKamichaMeld(meld);
+    }
+    if (seat === "shimocha") {
+      return renderShimochaMeld(meld);
     }
     if (meld.type === "ankan") {
       const tiles = meldBaseTiles(meld);
