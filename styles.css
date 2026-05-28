@@ -1697,6 +1697,8 @@ button {
 }
 
 .opponent-left .side-meld-lane {
+  --open-tile-width: clamp(17px, 2vw, 27px);
+  --open-tile-height: calc(var(--open-tile-width) * 1.40625);
   position: static;
   align-self: end;
   justify-self: start;
@@ -4044,6 +4046,8 @@ button:disabled:hover,
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left .side-meld-lane {
+    --open-tile-width: var(--landscape-tile-width);
+    --open-tile-height: var(--center-river-tile-long);
     position: static;
     padding: 0;
     gap: 0;
