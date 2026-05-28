@@ -622,12 +622,12 @@
     const kamicha = battleState.players[2];
 
     self.hand = takeTiles(["m1", "m9", "p1", "p4", "p5_red", "p5_blue", "p6", "s1", "s2", "s3", "east"]);
-    shimocha.hand = takeTiles(["p2", "p3", "p7", "s1", "s2", "s6", "north", "white", "green"]);
+    shimocha.hand = takeTiles(["p8", "p3", "p7", "s1", "s2", "s6", "north", "white", "green"]);
     kamicha.hand = takeTiles(["p1", "p6", "p9", "s2", "s3", "s7", "west", "red", "north"]);
 
-    self.discards = takeTiles(["s8", "south", "p8", "s9", "white", "p7"]).map((tile) => ({ tile }));
-    shimocha.discards = takeTiles(["p3", "s4", "m9", "green", "p9", "s1"]).map((tile) => ({ tile }));
-    kamicha.discards = takeTiles(["s6", "p4", "east", "south", "p2", "s7"]).map((tile) => ({ tile }));
+    self.discards = takeTiles(["s8", "p3", "p8", "s9", "white", "p7"]).map((tile) => ({ tile }));
+    shimocha.discards = takeTiles(["p3", "s5_red", "m9", "green", "p9", "s1"]).map((tile) => ({ tile }));
+    kamicha.discards = takeTiles(["s6", "p4", "east", "m9", "m1", "s7"]).map((tile) => ({ tile }));
 
     self.melds = [
       makeKakanMeld(0, 1, "p2", "self_from_shimocha"),
