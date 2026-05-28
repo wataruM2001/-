@@ -1546,13 +1546,13 @@ button {
 }
 
 .opponent-left .side-flower-lane {
-  left: calc(100% + 8px);
-  bottom: 2px;
+  left: calc(100% + 8px + var(--hand-tile-width));
+  bottom: calc(2px + (var(--hand-tile-width) * 1.40625 * 1.5));
 }
 
 .opponent-right .side-flower-lane {
-  right: calc(100% + 8px);
-  top: 42px;
+  right: calc(100% + 8px + (var(--hand-tile-width) * 0.5));
+  top: 0;
 }
 
 .side-flower-lane:empty,
@@ -4071,6 +4071,11 @@ button:disabled:hover,
     left: calc(100% + 2px);
   }
 
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left .side-flower-lane {
+    left: calc(100% + 2px + var(--hand-tile-width));
+    bottom: calc(2px + (var(--hand-tile-width) * 1.40625 * 1.5));
+  }
+
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left .side-meld-lane {
     --open-tile-width: calc(var(--landscape-tile-width) * 0.8);
     --open-tile-height: calc(var(--open-tile-width) * 1.40625);
@@ -4083,6 +4088,11 @@ button:disabled:hover,
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-flower-lane,
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-meld-lane {
     right: calc(100% + 2px);
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-flower-lane {
+    right: calc(100% + 2px + (var(--hand-tile-width) * 0.5));
+    top: 0;
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-meld-lane {
