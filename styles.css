@@ -1551,7 +1551,7 @@ button {
 }
 
 .opponent-right .side-flower-lane {
-  right: calc(100% + 8px + (var(--hand-tile-width) * 0.5));
+  right: calc(100% + 8px + (var(--hand-tile-width) * 0.75));
   top: 0;
 }
 
@@ -4102,7 +4102,7 @@ button:disabled:hover,
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-flower-lane {
-    right: calc(100% + 2px + (var(--hand-tile-width) * 0.5));
+    right: calc(100% + 2px + (var(--hand-tile-width) * 0.75));
     top: 0;
   }
 
