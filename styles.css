@@ -1,5 +1,5 @@
 :root {
-  --landscape-center-text-version: "v87";
+  --landscape-center-text-version: "v88";
   --felt: #0e4d3f;
   --felt-dark: #08342d;
   --ink: #16211f;
@@ -4054,7 +4054,7 @@ button:disabled:hover,
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .landscape-round-line-sub,
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .landscape-round-line-remaining {
-    font-size: 13px;
+    font-size: 10px;
     line-height: 1.1;
     font-weight: 800;
   }
@@ -4069,12 +4069,12 @@ button:disabled:hover,
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .kamicha-score {
     left: 5px;
-    top: calc(50% - var(--center-river-tile-long) * 0.3);
+    top: calc(50% - var(--center-river-tile-long) * 0.3 - 7px);
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .shimocha-score {
     right: 5px;
-    top: calc(50% - var(--center-river-tile-long) * 0.3);
+    top: calc(50% - var(--center-river-tile-long) * 0.3 - 7px);
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-score {
