@@ -3949,6 +3949,9 @@ button:disabled:hover,
     --center-layout-downshift: 0px;
     --self-hand-bottom-offset: 2px;
     --hand-tile-width: var(--self-hand-landscape-tile-width);
+    --landscape-self-hand-tile-height: calc(var(--hand-tile-width) * 1.40625);
+    --landscape-self-hand-visual-bottom: calc(var(--self-hand-bottom-offset) + 2px);
+    --landscape-self-hand-visual-top: calc(100dvh - var(--landscape-self-hand-visual-bottom) - var(--landscape-self-hand-tile-height));
     --draw-tile-gap-ratio: 0.24;
     --draw-tile-gap: calc(var(--hand-tile-width) * var(--draw-tile-gap-ratio));
     --battle-action-gap: clamp(6px, calc(var(--hand-tile-width) * 0.55), 18px);
@@ -4109,7 +4112,7 @@ button:disabled:hover,
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left .side-flower-lane {
     left: calc(100% + 2px + var(--hand-tile-width));
-    bottom: calc(2px + (var(--hand-tile-width) * 1.40625 * 1.5));
+    bottom: calc(var(--landscape-self-hand-visual-bottom) - 8dvh);
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-left .side-meld-lane {
@@ -4128,7 +4131,7 @@ button:disabled:hover,
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-flower-lane {
     right: calc(100% + 2px + (var(--hand-tile-width) * 0.75));
-    top: 0;
+    top: calc(var(--landscape-self-hand-visual-top) - 2dvh);
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .opponent-right .side-meld-lane {
@@ -4208,7 +4211,7 @@ button:disabled:hover,
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-flower-lane {
-    right: calc(clamp(10px, 3vw, 24px) + var(--self-flower-left-shift));
+    right: var(--landscape-side-margin);
     bottom: calc(var(--hand-tile-width) * 1.40625 + 33px);
     padding: 2px;
     gap: 1px;
