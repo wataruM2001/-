@@ -140,6 +140,24 @@
     s5: image("s5.png"),
     blue_back: BACK_TILE_IMAGE,
   });
+  const tileImagePathCache = new Map();
+
+  function horizontalImagePath(path) {
+    if (!path) return "";
+    const [filePath, query = ""] = String(path).split("?");
+    if (!filePath.endsWith(".png")) return "";
+    return `${filePath.replace(/\.png$/, "_horizontal.png")}${query ? `?${query}` : ""}`;
+  }
+
+  const ALL_TILE_IMAGE_PATHS = Object.freeze(
+    Array.from(
+      new Set(
+        Object.values(IMAGE_PATHS)
+          .flatMap((path) => [path, horizontalImagePath(path)])
+          .filter(Boolean)
+      )
+    )
+  );
 
   function tileKindId(tileOrId) {
     const id = typeof tileOrId === "string" ? tileOrId : tileOrId?.id;
@@ -320,7 +338,15 @@
       return tileOrId.image;
     }
     const id = typeof tileOrId === "string" ? tileOrId : tileOrId?.id;
-    return IMAGE_PATHS[id] || IMAGE_PATHS[tileKindId(id)] || getTileDefinition(tileOrId)?.image || "";
+    const cacheKey = id || "";
+    if (tileImagePathCache.has(cacheKey)) return tileImagePathCache.get(cacheKey);
+    const path = IMAGE_PATHS[id] || IMAGE_PATHS[tileKindId(id)] || getTileDefinition(tileOrId)?.image || "";
+    tileImagePathCache.set(cacheKey, path);
+    return path;
+  }
+
+  function tileImagePaths() {
+    return ALL_TILE_IMAGE_PATHS;
   }
 
   function totalTileCount() {
@@ -359,5 +385,6 @@
     tileImagePath,
     totalTileCount,
     summarizeTileKinds,
+    tileImagePaths,
   };
 });
