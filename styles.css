@@ -1,5 +1,5 @@
 :root {
-  --landscape-center-text-version: "v97";
+  --landscape-center-text-version: "v98";
   --felt: #0e4d3f;
   --felt-dark: #08342d;
   --ink: #16211f;
@@ -4219,6 +4219,11 @@ button:disabled:hover,
     height: auto;
     aspect-ratio: 128 / 180;
     object-fit: contain;
+  }
+
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .side-meld-lane .table-tile-img,
+  .battle-surface:not(.is-start-screen):not(.is-rules-screen) .side-meld-lane .called-tile-stack .table-tile-img {
+    width: var(--open-tile-width);
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-hand .table-tile-img {
