@@ -1,5 +1,5 @@
 :root {
-  --landscape-center-text-version: "v101";
+  --landscape-center-text-version: "v102";
   --felt: #0e4d3f;
   --felt-dark: #08342d;
   --ink: #16211f;
@@ -1311,6 +1311,9 @@ button {
   height: auto;
   aspect-ratio: 128 / 180;
   object-fit: contain;
+  display: block;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.24));
 }
 
@@ -2002,10 +2005,13 @@ button {
   --tile-rotation: 0deg;
   display: block;
   width: clamp(24px, 5vw, 66px);
+  height: auto;
   aspect-ratio: 128 / 180;
   object-fit: contain;
   flex: 0 0 auto;
   transform-origin: center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   filter: drop-shadow(0 8px 7px rgba(0, 0, 0, 0.3));
 }
 
@@ -2706,9 +2712,13 @@ input[type="checkbox"] {
 
 .image-tile img {
   width: 56px;
+  height: auto;
   aspect-ratio: 128 / 180;
   object-fit: contain;
+  display: block;
   flex: 0 0 auto;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .image-tile small {
