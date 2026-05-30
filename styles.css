@@ -1,5 +1,5 @@
 :root {
-  --landscape-center-text-version: "v96";
+  --landscape-center-text-version: "v97";
   --felt: #0e4d3f;
   --felt-dark: #08342d;
   --ink: #16211f;
@@ -4146,6 +4146,7 @@ button:disabled:hover,
     padding: 0;
     gap: var(--side-meld-group-gap);
     align-items: flex-end;
+    transform: translateY(10px);
   }
 
   .battle-surface:not(.is-start-screen):not(.is-rules-screen) .self-meld-lane {
