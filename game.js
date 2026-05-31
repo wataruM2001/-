@@ -580,15 +580,28 @@
     return 13 - unique - (hasPair ? 1 : 0);
   }
 
+  function estimateShantenInfo(playerOrTiles) {
+    const isTileArray = Array.isArray(playerOrTiles);
+    const meldCount = isTileArray ? 0 : (playerOrTiles?.melds || []).length;
+    const hand = cloneTiles(isTileArray ? playerOrTiles : (playerOrTiles?.hand || []));
+    const standardShanten = estimateStandardShanten(hand, meldCount);
+    const chiitoiShanten = meldCount === 0 ? estimateChiitoitsuShanten(hand) : 99;
+    const kokushiShanten = meldCount === 0 ? estimateKokushiShanten(hand) : 99;
+    const allShanten = Math.min(standardShanten, chiitoiShanten, kokushiShanten);
+    return {
+      standardShanten,
+      chiitoiShanten,
+      kokushiShanten,
+      allShanten,
+    };
+  }
+
+  function calculateShantenInfo(handTiles) {
+    return estimateShantenInfo(handTiles);
+  }
+
   function estimateShanten(player) {
-    const meldCount = (player?.melds || []).length;
-    const hand = cloneTiles(player?.hand || []);
-    const values = [estimateStandardShanten(hand, meldCount)];
-    if (meldCount === 0) {
-      values.push(estimateChiitoitsuShanten(hand));
-      values.push(estimateKokushiShanten(hand));
-    }
-    return Math.min(...values);
+    return estimateShantenInfo(player).allShanten;
   }
 
   function isYakuhaiBaseId(baseId, gameState, playerIndex) {
@@ -713,6 +726,7 @@
     return {
       playerId: player?.id || "",
       shantenCache: new Map(),
+      shantenInfoCache: new Map(),
       acceptanceCache: new Map(),
       completedMeldCache: new Map(),
       doraPriorityCache: new Map(),
@@ -725,11 +739,22 @@
 
   function estimateShantenCached(player, context = null) {
     if (!context) return estimateShanten(player);
+    return estimateShantenInfoCached(player, context).allShanten;
+  }
+
+  function estimateShantenInfoCached(player, context = null) {
+    if (!context) return estimateShantenInfo(player);
     const key = playerShantenCacheKey(player);
-    if (context.shantenCache.has(key)) return context.shantenCache.get(key);
-    const value = estimateShanten(player);
-    context.shantenCache.set(key, value);
+    if (context.shantenInfoCache?.has(key)) return context.shantenInfoCache.get(key);
+    const value = estimateShantenInfo(player);
+    if (context.shantenInfoCache) context.shantenInfoCache.set(key, value);
+    if (context.shantenCache) context.shantenCache.set(key, value.allShanten);
     return value;
+  }
+
+  function estimateShantenByBasisCached(player, context = null, shantenBasis = "all") {
+    const info = estimateShantenInfoCached(player, context);
+    return shantenBasis === "standard" ? info.standardShanten : info.allShanten;
   }
 
   function acceptanceSourceTilesForPlayer(player, gameState, context = null) {
@@ -755,22 +780,23 @@
     return countWinningTilesInDrawableAndRinshanTiles(option?.waits || [], gameState);
   }
 
-  function acceptanceTilesForPlayerState(player, gameState, context = null) {
+  function acceptanceTilesForPlayerState(player, gameState, context = null, shantenBasis = "all") {
     const handKey = playerShantenCacheKey(player);
     const canUseContextSource = Boolean(context?.playerId && player?.id && context.playerId === player.id);
     const sourceKey = canUseContextSource
       ? context.acceptanceSourceKey
       : tilesBaseKey(acceptanceSourceTilesForPlayer(player, gameState));
-    const cacheKey = `${handKey}|${sourceKey}`;
+    const basis = shantenBasis === "standard" ? "standard" : "all";
+    const cacheKey = `${basis}|${handKey}|${sourceKey}`;
     if (context?.acceptanceCache?.has(cacheKey)) return context.acceptanceCache.get(cacheKey);
-    const shanten = estimateShantenCached(player, context);
+    const shanten = estimateShantenByBasisCached(player, context, basis);
     const sourceTiles = acceptanceSourceTilesForPlayer(player, gameState, context);
     const result = sourceTiles.filter((drawTileCandidate) => {
       const afterDraw = {
         ...player,
         hand: [...cloneTiles(player?.hand || []), cloneTile(drawTileCandidate)],
       };
-      return estimateShantenCached(afterDraw, context) === shanten - 1;
+      return estimateShantenByBasisCached(afterDraw, context, basis) === shanten - 1;
     });
     if (context?.acceptanceCache) context.acceptanceCache.set(cacheKey, result);
     return result;
@@ -1028,9 +1054,9 @@
     return value;
   }
 
-  function countAcceptanceTilesAfterDiscard(player, discardTile, gameState, context = null) {
+  function countAcceptanceTilesAfterDiscard(player, discardTile, gameState, context = null, shantenBasis = "all") {
     const afterDiscard = playerAfterDiscard(player, discardTile);
-    return acceptanceTilesForPlayerState(afterDiscard, gameState, context).length;
+    return acceptanceTilesForPlayerState(afterDiscard, gameState, context, shantenBasis).length;
   }
 
   function chooseLegacyCpuDiscard(candidates, player, gameState, random = Math.random) {
@@ -1053,13 +1079,14 @@
     return ranked[0]?.tile || candidates[0] || null;
   }
 
-  function chooseMaxAcceptanceDiscard(candidates, player, gameState, random = Math.random, context = null) {
+  function chooseMaxAcceptanceDiscard(candidates, player, gameState, random = Math.random, context = null, shantenBasis = "all") {
+    const basis = shantenBasis === "standard" ? "standard" : "all";
     const ranked = cloneTiles(candidates).map((tile) => {
       const trialPlayer = playerAfterDiscard(player, tile);
       return {
         tile,
-        shanten: estimateShantenCached(trialPlayer, context),
-        acceptance: countAcceptanceTilesAfterDiscard(player, tile, gameState, context),
+        shanten: estimateShantenByBasisCached(trialPlayer, context, basis),
+        acceptance: countAcceptanceTilesAfterDiscard(player, tile, gameState, context, basis),
         edgePriority: edgeDiscardPriority(tile),
         doraPriority: doraDiscardPriority(tile, gameState, context),
         tieBreaker: random(),
@@ -1081,7 +1108,9 @@
   function chooseStandardCpuDiscard(player, gameState, random = Math.random, context = null) {
     const candidates = discardCandidatesForPlayer(player, gameState);
     if (candidates.length === 0) return null;
-    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context);
+    const shantenInfo = estimateShantenInfoCached(player, context);
+    const shantenBasis = shantenInfo.allShanten <= 1 ? "all" : "standard";
+    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis);
   }
 
   function discardTilesOf(player) {
@@ -2956,6 +2985,7 @@
     canDiscardDuringActionPending,
     skipOptionalSelfActionsBeforeDiscard,
     getWinningTiles,
+    calculateShantenInfo,
     countWinningTilesInDrawableAndRinshanTiles,
     countWinningTilesInDrawableTiles,
     chooseCpuDiscard,
