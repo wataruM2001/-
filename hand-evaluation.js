@@ -481,7 +481,7 @@
   }
 
   function isValuePair(pairBaseId, context = {}) {
-    if (["white", "green", "red"].includes(pairBaseId)) return true;
+    if (["white", "green", "red", "north"].includes(pairBaseId)) return true;
     return pairBaseId === context.roundWind || pairBaseId === context.seatWind;
   }
 
