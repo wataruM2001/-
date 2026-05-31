@@ -3021,6 +3021,10 @@
   }
 
   function paifuPlayerSnapshot(player, index, gameState) {
+    const drawnTile = paifuDrawnTileForPlayer(gameState, index);
+    const handTiles = sortedBattleTiles(drawnTile
+      ? removeOneTileById(player.hand || [], drawnTile.id)
+      : clonePaifuData(player.hand || []));
     return {
       id: player.id,
       index,
@@ -3028,7 +3032,9 @@
       displayName: displayPlayerNameByIndex(index),
       points: Number(player.points) || 0,
       chips: Number(player.chips) || 0,
-      hand: sortedBattleTiles(clonePaifuData(player.hand || [])),
+      hand: handTiles,
+      handTiles,
+      drawnTile: drawnTile ? clonePaifuData(drawnTile) : null,
       discards: clonePaifuData(player.discards || []),
       flowers: clonePaifuData(player.flowers || []),
       melds: clonePaifuData(player.melds || []),
@@ -3068,6 +3074,29 @@
       doraIndicators: clonePaifuData(gameState.doraIndicators || []),
       uraDoraIndicators: clonePaifuData(gameState.uraDoraIndicators || []),
     });
+  }
+
+  function paifuDrawnTileForPlayer(gameState, playerIndex) {
+    const player = gameState?.players?.[playerIndex];
+    if (!player) return null;
+    const action = gameState?.lastAction || {};
+    const isTsumoWin =
+      action.type === "win" &&
+      action.winType === "tsumo" &&
+      Number.isInteger(action.winnerIndex) &&
+      action.winnerIndex === playerIndex;
+    if (isTsumoWin && action.winningTile?.id) {
+      return player.hand?.find((tile) => tile.id === action.winningTile.id) || action.winningTile;
+    }
+    const isDrawnTurn =
+      (gameState?.phase === "discard" || gameState?.phase === "actionPending") &&
+      (action.type === "draw" || action.type === "riichiDeclaration") &&
+      action.playerIndex === playerIndex &&
+      action.tileId;
+    if (isDrawnTurn) {
+      return player.hand?.find((tile) => tile.id === action.tileId) || null;
+    }
+    return null;
   }
 
   function paifuSnapshotSignature(gameState, actionType, actionText) {
@@ -5672,15 +5701,42 @@
     };
   }
 
+  function paifuConcealedHandTiles(player) {
+    return Array.isArray(player?.handTiles) ? player.handTiles : player?.hand || [];
+  }
+
   function renderPaifuOpenHand(player, modifier = "") {
-    return sortedBattleTiles(player?.hand || [])
-      .map((tile) => renderBattleTile(tile, ["paifu-tile", modifier].filter(Boolean).join(" ")))
+    const classPrefix = ["paifu-tile", modifier].filter(Boolean).join(" ");
+    const normalTiles = sortedBattleTiles(paifuConcealedHandTiles(player))
+      .map((tile) => renderBattleTile(tile, classPrefix))
       .join("");
+    const drawnTile = player?.drawnTile
+      ? renderBattleTile(player.drawnTile, `${classPrefix} drawn`)
+      : "";
+    return player?.seat === "shimocha"
+      ? drawnTile + normalTiles
+      : normalTiles + drawnTile;
+  }
+
+  function renderPaifuSideBackHand(player) {
+    const concealedCount = paifuConcealedHandTiles(player).length;
+    const hasDrawnTile = Boolean(player?.drawnTile);
+    if (!hasDrawnTile) return renderBackTiles(concealedCount, `side ${tileRotationClassForSeat(player?.seat)}`);
+    const rotationClass = tileRotationClassForSeat(player?.seat);
+    const renderBack = (index, isDrawn = false) => {
+      const classes = ["table-back", "side", rotationClass, isDrawn ? "drawn" : ""].filter(Boolean).join(" ");
+      return `<img class="table-tile-img ${classes}" src="${escapeHtml(Tiles.tileImagePath("blue_back"))}" alt="opponent tile ${index + 1}" ${tileImageAttributes()} />`;
+    };
+    const normalTiles = Array.from({ length: concealedCount }, (_, index) => renderBack(index)).join("");
+    const drawnTile = renderBack(concealedCount, true);
+    return player?.seat === "shimocha"
+      ? drawnTile + normalTiles
+      : normalTiles + drawnTile;
   }
 
   function renderPaifuSideHand(player) {
     if (!showPaifuOpponentHands) {
-      return renderBackTiles(player?.hand?.length || 0, `side ${tileRotationClassForSeat(player?.seat)}`);
+      return renderPaifuSideBackHand(player);
     }
     const rotationClass = tileRotationClassForSeat(player?.seat);
     return renderPaifuOpenHand(player, `side ${rotationClass}`);
