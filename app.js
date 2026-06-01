@@ -19,16 +19,18 @@
   const STATS_STORAGE_KEY = "marchaoSanmaStatsV1";
   const IN_PROGRESS_STORAGE_KEY = "marchaoSanmaInProgressV1";
   const SOUND_SETTINGS_STORAGE_KEY = "marchaoSanmaSoundSettingsV1";
+  const SOUND_FILE_VERSION = "sound-files-v112";
+  const soundFile = (path) => `${path}?v=${SOUND_FILE_VERSION}`;
   const SOUND_FILES = {
-    startGame: "./sounds/button_decide.mp3",
-    discard: "./sounds/discard.mp3",
-    skipPrompt: "./sounds/button_cancel.mp3",
-    screenTransition: "./sounds/button_decide.mp3",
-    riichi: "./sounds/riichi.mp3",
-    pon: "./sounds/pon.mp3",
-    kan: "./sounds/kan.mp3",
-    tsumo: "./sounds/tsumo.mp3",
-    ron: "./sounds/ron.mp3",
+    startGame: soundFile("./sounds/button_decide.mp3"),
+    discard: soundFile("./sounds/discard.mp3"),
+    skipPrompt: soundFile("./sounds/button_cancel.mp3"),
+    screenTransition: soundFile("./sounds/button_decide.mp3"),
+    riichi: soundFile("./sounds/riichi.mp3"),
+    pon: soundFile("./sounds/pon.mp3"),
+    kan: soundFile("./sounds/kan.mp3"),
+    tsumo: soundFile("./sounds/tsumo.mp3"),
+    ron: soundFile("./sounds/ron.mp3"),
   };
   const SOUND_VOLUME = {
     startGame: 0.55,
