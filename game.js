@@ -767,6 +767,11 @@
     return shantenBasis === "standard" ? info.standardShanten : info.allShanten;
   }
 
+  function cpuDiscardShantenBasis(player, context = null) {
+    const info = estimateShantenInfoCached(player, context);
+    return info.allShanten <= 1 ? "all" : "standard";
+  }
+
   function acceptanceSourceTilesForPlayer(player, gameState, context = null) {
     if (context?.playerId && player?.id && context.playerId === player.id) {
       return context.acceptanceSourceTiles || [];
@@ -1164,11 +1169,14 @@
       })[0]?.tile || null;
   }
 
+  function chooseBestWithinSafeCategory(candidates, player, gameState, random = Math.random, context = null, shantenBasis = "all") {
+    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, true);
+  }
+
   function chooseStandardCpuDiscard(player, gameState, random = Math.random, context = null) {
     const candidates = discardCandidatesForPlayer(player, gameState);
     if (candidates.length === 0) return null;
-    const shantenInfo = estimateShantenInfoCached(player, context);
-    const shantenBasis = shantenInfo.allShanten <= 1 ? "all" : "standard";
+    const shantenBasis = cpuDiscardShantenBasis(player, context);
     return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, true);
   }
 
@@ -1395,48 +1403,22 @@
     return { priority: 5, genbutsuCount: 0 };
   }
 
-  function chooseByDefensivePriority(candidates, player, gameState, random = Math.random, context = null) {
+  function chooseByDefensivePriority(candidates, player, gameState, random = Math.random, context = null, shantenBasis = "all") {
     const ranked = cloneTiles(candidates).map((tile) => {
       const defense = defensivePriority(tile, player, gameState, context);
       return {
         tile,
         priority: defense.priority,
-        genbutsuCount: defense.genbutsuCount,
-        acceptance: countAcceptanceTilesAfterDiscard(player, tile, gameState, context),
-        edgePriority: edgeDiscardPriority(tile),
-        doraPriority: doraDiscardPriority(tile, gameState, context),
-        tieBreaker: random(),
       };
     });
     if (ranked.length === 0) return null;
     const minPriority = Math.min(...ranked.map((entry) => entry.priority));
     const filtered = ranked.filter((entry) => entry.priority === minPriority);
-    if (minPriority === 5) {
-      return chooseMaxAcceptanceDiscard(filtered.map((entry) => entry.tile), player, gameState, random, context);
-    }
-    return filtered.sort((left, right) => {
-      if (left.genbutsuCount !== right.genbutsuCount) return right.genbutsuCount - left.genbutsuCount;
-      if (left.edgePriority !== right.edgePriority) return left.edgePriority - right.edgePriority;
-      if (left.doraPriority !== right.doraPriority) return left.doraPriority - right.doraPriority;
-      if (left.acceptance !== right.acceptance) return right.acceptance - left.acceptance;
-      return left.tieBreaker - right.tieBreaker;
-    })[0]?.tile || null;
+    return chooseBestWithinSafeCategory(filtered.map((entry) => entry.tile), player, gameState, random, context, shantenBasis);
   }
 
-  function chooseUltraSpecialTieBreaker(candidates, player, gameState, random = Math.random, context = null) {
-    const ranked = cloneTiles(candidates).map((tile) => ({
-      tile,
-      acceptance: countAcceptanceTilesAfterDiscard(player, tile, gameState, context),
-      edgePriority: edgeDiscardPriority(tile),
-      doraPriority: doraDiscardPriority(tile, gameState, context),
-      tieBreaker: random(),
-    }));
-    return ranked.sort((left, right) => {
-      if (left.edgePriority !== right.edgePriority) return left.edgePriority - right.edgePriority;
-      if (left.doraPriority !== right.doraPriority) return left.doraPriority - right.doraPriority;
-      if (left.acceptance !== right.acceptance) return right.acceptance - left.acceptance;
-      return left.tieBreaker - right.tieBreaker;
-    })[0]?.tile || null;
+  function chooseUltraSpecialTieBreaker(candidates, player, gameState, random = Math.random, context = null, shantenBasis = "all") {
+    return chooseBestWithinSafeCategory(candidates, player, gameState, random, context, shantenBasis);
   }
 
   function chooseTenpaiKeepingMaxAcceptanceDiscard(candidates, player, gameState, random = Math.random, context = null) {
@@ -1457,7 +1439,8 @@
     if (allCandidates.length === 0) return null;
     const safeCandidates = removeRonDangerTiles(allCandidates, player, gameState);
     const candidates = safeCandidates.length > 0 ? safeCandidates : allCandidates;
-    return chooseByDefensivePriority(candidates, player, gameState, random, context);
+    const shantenBasis = cpuDiscardShantenBasis(player, context);
+    return chooseByDefensivePriority(candidates, player, gameState, random, context, shantenBasis);
   }
 
   function chooseSpecialCpuDiscard(player, gameState, random = Math.random, context = null) {
@@ -1467,6 +1450,7 @@
   function chooseUltraSpecialCpuDiscard(player, gameState, random = Math.random, context = null) {
     const candidates = discardCandidatesForPlayer(player, gameState);
     if (candidates.length === 0) return null;
+    const shantenBasis = cpuDiscardShantenBasis(player, context);
     const kamicha = kamichaEntryFor(player, gameState);
     const shimocha = shimochaEntryFor(player, gameState);
     const opponents = [kamicha, shimocha].filter(Boolean);
@@ -1475,7 +1459,7 @@
       opponents.every((entry) => hasSameBaseTileInRiver(tile, entry.player, context))
     );
     if (bothRiverTiles.length > 0) {
-      return chooseUltraSpecialTieBreaker(bothRiverTiles, player, gameState, random, context);
+      return chooseUltraSpecialTieBreaker(bothRiverTiles, player, gameState, random, context, shantenBasis);
     }
 
     const honorOrNoChanceTiles = candidates.filter((tile) =>
@@ -1486,7 +1470,7 @@
       noChanceTile(tile, player, gameState, context)
     );
     if (honorOrNoChanceTiles.length > 0) {
-      return chooseUltraSpecialTieBreaker(honorOrNoChanceTiles, player, gameState, random, context);
+      return chooseUltraSpecialTieBreaker(honorOrNoChanceTiles, player, gameState, random, context, shantenBasis);
     }
 
     const dealer = dealerEntryFor(gameState);
@@ -1494,7 +1478,7 @@
       ? candidates.filter((tile) => hasSameBaseTileInRiver(tile, dealer.player, context))
       : [];
     if (dealerRiverTiles.length > 0) {
-      return chooseUltraSpecialTieBreaker(dealerRiverTiles, player, gameState, random, context);
+      return chooseUltraSpecialTieBreaker(dealerRiverTiles, player, gameState, random, context, shantenBasis);
     }
 
     const childOpponents = opponents.filter((entry) => entry.index !== dealer?.index);
@@ -1504,7 +1488,7 @@
         )
       : [];
     if (childRiverTiles.length > 0) {
-      return chooseUltraSpecialTieBreaker(childRiverTiles, player, gameState, random, context);
+      return chooseUltraSpecialTieBreaker(childRiverTiles, player, gameState, random, context, shantenBasis);
     }
 
     return chooseStandardCpuDiscard(player, gameState, random, context);
