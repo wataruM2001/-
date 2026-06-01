@@ -174,6 +174,9 @@
   let currentSharedPaifuUrl = "";
   let isSettlementPreview = false;
   let isFuroDebugScenario = false;
+  let resumeMessageText = "";
+  let resumeMessageIsError = false;
+  let resumeStartNewOnNextClick = false;
   let authSession = null;
   let authUser = null;
   let authMessageText = "";
@@ -262,6 +265,7 @@
     soundSettingButtons: Array.from(document.querySelectorAll("[data-sound-setting]")),
     resumeRequiredScreen: document.getElementById("resumeRequiredScreen"),
     resumeRequiredButton: document.getElementById("resumeRequiredButton"),
+    resumeRequiredMessage: document.getElementById("resumeRequiredMessage"),
     battleSelfHand: document.getElementById("battleSelfHand"),
     battleLeftHand: document.getElementById("battleLeftHand"),
     battleRightHand: document.getElementById("battleRightHand"),
@@ -1342,10 +1346,14 @@
 
   function loadInProgressHanchanSave() {
     try {
-      const parsed = JSON.parse(localStorage.getItem(IN_PROGRESS_STORAGE_KEY) || "null");
+      const raw = localStorage.getItem(IN_PROGRESS_STORAGE_KEY);
+      console.info("[resume] localStorage read", raw ? "found" : "empty");
+      const parsed = JSON.parse(raw || "null");
+      console.info("[resume] JSON parse", parsed ? "success" : "empty");
       if (!parsed || !parsed.battleState || parsed.completed) return null;
       return parsed;
     } catch (error) {
+      console.error("[resume] JSON parse failed", error);
       return null;
     }
   }
@@ -1435,20 +1443,146 @@
     return next;
   }
 
-  function resumeInProgressHanchan() {
-    const save = applyResumePausedTime(loadInProgressHanchanSave());
-    if (!save) {
-      appScreen = "start";
-      renderBattleTable();
-      return;
+  function resumeLog(message, detail = null) {
+    if (detail == null) {
+      console.info("[resume]", message);
+    } else {
+      console.info("[resume]", message, detail);
     }
+  }
+
+  function setResumeMessage(message, isError = false) {
+    resumeMessageText = message || "";
+    resumeMessageIsError = Boolean(isError);
+    if (els.resumeRequiredMessage) {
+      els.resumeRequiredMessage.textContent = resumeMessageText;
+      els.resumeRequiredMessage.classList.toggle("is-error", resumeMessageIsError);
+      setHiddenIfChanged(els.resumeRequiredMessage, !resumeMessageText);
+    }
+  }
+
+  function resetVolatileResumeState() {
     clearCpuTurnTimer();
     clearRiichiAutoDiscardTimer();
     clearAfterDiscardTimer();
     clearResultTransitionTimer();
     stopPaifuPlayback();
     resetBattleEffectState();
-    battleState = cloneStorageData(save.battleState);
+    lastSkipPromptSoundSignature = "";
+  }
+
+  function normalizeResumePlayer(player, index) {
+    if (!player || typeof player !== "object") {
+      throw new Error(`プレイヤーデータ${index + 1}が見つかりません。`);
+    }
+    const next = {
+      ...player,
+      id: player.id || `player-${index + 1}`,
+      seat: player.seat || ["self", "shimocha", "kamicha"][index] || `player-${index + 1}`,
+      name: player.name || ["自分", "下家", "上家"][index] || `Player ${index + 1}`,
+      points: Number.isFinite(Number(player.points)) ? Number(player.points) : 35000,
+      chips: Number.isFinite(Number(player.chips)) ? Number(player.chips) : 0,
+      hand: Array.isArray(player.hand) ? player.hand : [],
+      discards: Array.isArray(player.discards) ? player.discards : [],
+      melds: Array.isArray(player.melds) ? player.melds : [],
+      flowers: Array.isArray(player.flowers) ? player.flowers : [],
+      riichiWinningTiles: Array.isArray(player.riichiWinningTiles) ? player.riichiWinningTiles : [],
+      isCpu: index !== 0 ? Boolean(player.isCpu ?? true) : false,
+      hasHadFirstDrawTurnThisHand: Boolean(player.hasHadFirstDrawTurnThisHand),
+    };
+    return next;
+  }
+
+  function hasValidPendingAction(gameState) {
+    const pending = gameState?.pendingAction;
+    if (!pending || typeof pending !== "object") return false;
+    if (!Number.isInteger(pending.playerIndex)) return false;
+    if (!gameState.players?.[pending.playerIndex]) return false;
+    if (!pending.availableActions || typeof pending.availableActions !== "object") return false;
+    return Object.values(pending.availableActions).some(Boolean);
+  }
+
+  function normalizeResumeBattleState(rawBattleState) {
+    if (!rawBattleState || typeof rawBattleState !== "object") {
+      throw new Error("対局データが空です。");
+    }
+    const next = cloneStorageData(rawBattleState);
+    if (!Array.isArray(next.players) || next.players.length < 3) {
+      throw new Error("プレイヤーデータが不足しています。");
+    }
+    next.players = next.players.slice(0, 3).map(normalizeResumePlayer);
+    const drawWall = Array.isArray(next.drawWall)
+      ? next.drawWall
+      : (Array.isArray(next.wall) ? next.wall : null);
+    if (!drawWall) {
+      throw new Error("牌山データが見つかりません。");
+    }
+    next.drawWall = drawWall;
+    next.wall = Array.isArray(next.wall) ? next.wall : drawWall;
+    next.dealTiles = Array.isArray(next.dealTiles) ? next.dealTiles : [];
+    next.rinshanTiles = Array.isArray(next.rinshanTiles) ? next.rinshanTiles : [];
+    next.doraIndicators = Array.isArray(next.doraIndicators) ? next.doraIndicators : [];
+    next.uraDoraIndicators = Array.isArray(next.uraDoraIndicators) ? next.uraDoraIndicators : [];
+    next.hanchanId = next.hanchanId || `resumed-${Date.now()}`;
+    next.dealerIndex = Number.isInteger(next.dealerIndex) ? next.dealerIndex : 0;
+    next.initialDealerIndex = Number.isInteger(next.initialDealerIndex) ? next.initialDealerIndex : next.dealerIndex;
+    next.currentPlayerIndex = Number.isInteger(next.currentPlayerIndex) ? next.currentPlayerIndex : next.dealerIndex;
+    next.currentPlayerIndex = Math.min(Math.max(next.currentPlayerIndex, 0), next.players.length - 1);
+    next.roundWind = next.roundWind || "east";
+    next.handNumber = Math.max(1, Math.floor(Number(next.handNumber) || 1));
+    next.honba = Math.max(0, Math.floor(Number(next.honba) || 0));
+    next.kyotaku = Math.max(0, Math.floor(Number(next.kyotaku) || 0));
+    next.remainingDraws = Math.max(0, Math.floor(Number(next.remainingDraws ?? next.drawWall.length) || 0));
+    next.lastDrawSource = next.lastDrawSource || "normal";
+    next.lastAction = next.lastAction && typeof next.lastAction === "object" ? next.lastAction : null;
+    next.paoState = next.paoState && typeof next.paoState === "object" ? next.paoState : null;
+    next.ponDiscardRestriction = next.ponDiscardRestriction && typeof next.ponDiscardRestriction === "object"
+      ? next.ponDiscardRestriction
+      : null;
+    next.riichiDeclaration = next.riichiDeclaration && typeof next.riichiDeclaration === "object"
+      ? next.riichiDeclaration
+      : null;
+    next.pendingRiichi = next.pendingRiichi && typeof next.pendingRiichi === "object" ? next.pendingRiichi : null;
+    delete next.pendingCpuDiscard;
+    delete next.cpuTurnTimer;
+    const allowedPhases = new Set(["dealing", "draw", "discard", "actionPending", "ryukyoku", "result", "ended"]);
+    next.phase = allowedPhases.has(next.phase) ? next.phase : "discard";
+    if (next.phase === "dealing") next.phase = "discard";
+    if (next.phase === "actionPending" && !hasValidPendingAction(next)) {
+      resumeLog("invalid actionPending cleared", next.pendingAction);
+      next.pendingAction = null;
+      next.phase = "discard";
+    }
+    if (next.phase !== "actionPending") {
+      next.pendingAction = null;
+    }
+    if (next.phase === "draw" && !(next.lastAction?.type === "discard")) {
+      next.phase = "discard";
+    }
+    return next;
+  }
+
+  function showResumeFailure(message) {
+    resumeStartNewOnNextClick = true;
+    appScreen = "resume";
+    setResumeMessage(message, true);
+    renderBattleTable();
+  }
+
+  function resumeInProgressHanchan() {
+    resumeLog("resume button pressed");
+    try {
+      const loaded = loadInProgressHanchanSave();
+      const save = applyResumePausedTime(loaded);
+      if (!save) {
+        resumeLog("no valid save");
+        resumeStartNewOnNextClick = false;
+        appScreen = "start";
+        renderBattleTable();
+        return;
+      }
+      resetVolatileResumeState();
+      battleState = normalizeResumeBattleState(save.battleState);
     normalizeHanchanTimingFields(battleState, save.hanchanStartedAt || save.paifuReplay?.startedAt || "");
     lastHandResult = cloneStorageData(save.lastHandResult) || null;
     battleSettlement = null;
@@ -1460,17 +1594,41 @@
     isViewingSharedPaifu = false;
     currentSharedPaifuUrl = "";
     settlementBreakdownVisible = false;
-    appScreen = save.appScreen === "result" && lastHandResult ? "result" : "playing";
+      appScreen = "playing";
+      resumeStartNewOnNextClick = false;
+      setResumeMessage("");
+      lastBattleEffectSignature = battleEffectSignature(battleState);
+      resumeLog("validated save", {
+        phase: battleState.phase,
+        currentPlayerIndex: battleState.currentPlayerIndex,
+        currentPlayerIsCpu: Boolean(battleState.players?.[battleState.currentPlayerIndex]?.isCpu),
+        actionPending: Boolean(battleState.pendingAction),
+      });
+      resumeLog("switch appScreen", appScreen);
     renderBattleTable();
-    if (appScreen === "playing") {
       if (isVisibleDiscardState(battleState)) {
+        resumeLog("reschedule after visible discard");
         scheduleAfterVisibleDiscard();
       } else {
         scheduleSelfRiichiAutoDiscard();
+        if (battleState?.phase === "discard" && battleState.players?.[battleState.currentPlayerIndex]?.isCpu) {
+          resumeLog("reschedule CPU turn", {
+            currentPlayerIndex: battleState.currentPlayerIndex,
+            playerId: battleState.players[battleState.currentPlayerIndex].id,
+          });
+        }
         scheduleCpuTurn();
       }
+      saveInProgressHanchan();
+    } catch (error) {
+      console.error("[resume] failed", error);
+      resetVolatileResumeState();
+      battleState = null;
+      lastHandResult = null;
+      battleSettlement = null;
+      clearInProgressHanchanSave();
+      showResumeFailure("保存された対局データを復元できませんでした。新しく対局を開始してください。");
     }
-    saveInProgressHanchan();
   }
 
   function updateResultPanelBounds() {
@@ -1514,6 +1672,12 @@
       startBattleHanchan();
     });
     els.resumeRequiredButton?.addEventListener("click", () => {
+      if (resumeStartNewOnNextClick) {
+        resumeStartNewOnNextClick = false;
+        setResumeMessage("");
+        startBattleHanchan();
+        return;
+      }
       resumeInProgressHanchan();
     });
     els.startRulesButton?.addEventListener("click", () => {
@@ -4872,6 +5036,10 @@
     setHiddenIfChanged(els.statsScreen, !isStats);
     setHiddenIfChanged(els.settingsScreen, !isSettings);
     setHiddenIfChanged(els.resumeRequiredScreen, !isResume);
+    if (els.resumeRequiredButton) {
+      els.resumeRequiredButton.textContent = resumeStartNewOnNextClick ? "新しく開始" : "再開する";
+    }
+    setResumeMessage(resumeMessageText, resumeMessageIsError);
     setHiddenIfChanged(els.battleStartButton, appScreen !== "start");
     setHiddenIfChanged(els.battleActionButtons, appScreen !== "playing");
     toggleClassIfChanged(els.battleResultPanel, "result-transparent", isResult && resultTransparent);
