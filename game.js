@@ -1576,6 +1576,57 @@
     };
   }
 
+  function playerAfterAnkanCandidate(player, candidate) {
+    return {
+      ...player,
+      hand: removeTilesById(player?.hand || [], candidate?.tiles || []),
+      melds: [
+        ...(player?.melds || []).map(cloneMeld).filter(Boolean),
+        {
+          id: `ankan_eval_${candidate?.baseId || "tile"}_${(player?.melds || []).length + 1}`,
+          type: "ankan",
+          baseId: candidate?.baseId,
+          tiles: cloneTiles(candidate?.tiles || []),
+        },
+      ],
+    };
+  }
+
+  function gameStateWithVirtualPlayer(gameState, player, playerIndex) {
+    return {
+      ...gameState,
+      players: (gameState?.players || []).map((entry, index) => index === playerIndex ? player : entry),
+    };
+  }
+
+  function chooseCpuAnkanCandidate(player, gameState, random = Math.random) {
+    if (!player?.isCpu || player.isRiichi) return null;
+    const candidates = getAnkanCandidates(player, gameState);
+    if (candidates.length === 0) return null;
+
+    const playerIndex = playerIndexForAcceptance(player, gameState);
+    const beforeContext = createCpuCalculationContext(player, gameState);
+    const beforeShanten = estimateShantenByBasisCached(player, beforeContext, "standard");
+    const beforeAcceptance = acceptanceTilesForPlayerState(player, gameState, beforeContext, "standard").length;
+
+    const matched = candidates.map((candidate) => {
+      const afterKan = playerAfterAnkanCandidate(player, candidate);
+      const virtualState = gameStateWithVirtualPlayer(gameState, afterKan, playerIndex);
+      const afterContext = createCpuCalculationContext(afterKan, virtualState);
+      return {
+        candidate,
+        shanten: estimateShantenByBasisCached(afterKan, afterContext, "standard"),
+        acceptance: acceptanceTilesForPlayerState(afterKan, virtualState, afterContext, "standard").length,
+        tieBreaker: random(),
+      };
+    }).filter((entry) =>
+      entry.shanten === beforeShanten &&
+      entry.acceptance === beforeAcceptance
+    );
+
+    return matched.sort((left, right) => left.tieBreaker - right.tieBreaker)[0]?.candidate || null;
+  }
+
   function chooseCpuKakanCandidate(player, gameState, random = Math.random) {
     if (!player?.isCpu || player.isRiichi) return null;
     const kamicha = kamichaEntryFor(player, gameState)?.player;
@@ -2737,6 +2788,11 @@
         const afterKan = callKan(next, next.currentPlayerIndex, cpuKakan);
         return afterKan.phase === "result" ? afterKan : afterPlayerDraw(afterKan);
       }
+      const cpuAnkan = chooseCpuAnkanCandidate(player, next);
+      if (cpuAnkan) {
+        const afterKan = callKan(next, next.currentPlayerIndex, cpuAnkan);
+        return afterKan.phase === "result" ? afterKan : afterPlayerDraw(afterKan);
+      }
       const cpuOptions = cpuRiichiOptions(player, next);
       if (cpuOptions.length > 0) {
         return startRiichiDeclaration(next, next.currentPlayerIndex, cpuOptions);
@@ -2994,6 +3050,7 @@
     isDangerousPlayer,
     countCompletedMeldsForCpu,
     chooseCpuPonReaction,
+    chooseCpuAnkanCandidate,
     chooseCpuKakanCandidate,
     chooseStandardCpuDiscard,
     chooseUltraSpecialCpuDiscard,
