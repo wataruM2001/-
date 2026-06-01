@@ -728,6 +728,7 @@
       shantenCache: new Map(),
       shantenInfoCache: new Map(),
       acceptanceCache: new Map(),
+      secondStepAcceptanceCache: new Map(),
       completedMeldCache: new Map(),
       doraPriorityCache: new Map(),
       discardBaseIdSetCache: new Map(),
@@ -1059,6 +1060,46 @@
     return acceptanceTilesForPlayerState(afterDiscard, gameState, context, shantenBasis).length;
   }
 
+  function acceptanceSourceAfterDrawingTile(player, gameState, context, drawnTile) {
+    const sourceTiles = acceptanceSourceTilesForPlayer(player, gameState, context);
+    return removeTilesById(sourceTiles, drawnTile ? [drawnTile] : []);
+  }
+
+  function secondStepAcceptanceScore(afterDiscardPlayer, gameState, context = null, shantenBasis = "all") {
+    const basis = shantenBasis === "standard" ? "standard" : "all";
+    const sourceKey = context?.playerId && afterDiscardPlayer?.id && context.playerId === afterDiscardPlayer.id
+      ? context.acceptanceSourceKey
+      : tilesBaseKey(acceptanceSourceTilesForPlayer(afterDiscardPlayer, gameState, context));
+    const cacheKey = `${basis}|${playerShantenCacheKey(afterDiscardPlayer)}|${sourceKey}`;
+    if (context?.secondStepAcceptanceCache?.has(cacheKey)) {
+      return context.secondStepAcceptanceCache.get(cacheKey);
+    }
+    const firstAcceptanceTiles = acceptanceTilesForPlayerState(afterDiscardPlayer, gameState, context, basis);
+    if (firstAcceptanceTiles.length === 0) {
+      if (context?.secondStepAcceptanceCache) context.secondStepAcceptanceCache.set(cacheKey, 0);
+      return 0;
+    }
+
+    const counts = firstAcceptanceTiles.map((drawTile) => {
+      const nextHandPlayer = {
+        ...afterDiscardPlayer,
+        hand: [...cloneTiles(afterDiscardPlayer?.hand || []), cloneTile(drawTile)],
+      };
+      const nextSourceTiles = acceptanceSourceAfterDrawingTile(afterDiscardPlayer, gameState, context, drawTile);
+      const baseContext = context || createCpuCalculationContext(afterDiscardPlayer, gameState);
+      const nextContext = {
+        ...baseContext,
+        acceptanceSourceTiles: nextSourceTiles,
+        acceptanceSourceKey: tilesBaseKey(nextSourceTiles),
+      };
+      return acceptanceTilesForPlayerState(nextHandPlayer, gameState, nextContext, basis).length;
+    });
+
+    const score = Math.min(...counts);
+    if (context?.secondStepAcceptanceCache) context.secondStepAcceptanceCache.set(cacheKey, score);
+    return score;
+  }
+
   function chooseLegacyCpuDiscard(candidates, player, gameState, random = Math.random) {
     const playerIndex = gameState?.players?.indexOf(player) ?? -1;
     const ranked = cloneTiles(candidates).map((tile) => {
@@ -1079,12 +1120,13 @@
     return ranked[0]?.tile || candidates[0] || null;
   }
 
-  function chooseMaxAcceptanceDiscard(candidates, player, gameState, random = Math.random, context = null, shantenBasis = "all") {
+  function chooseMaxAcceptanceDiscard(candidates, player, gameState, random = Math.random, context = null, shantenBasis = "all", useSecondStepAcceptance = false) {
     const basis = shantenBasis === "standard" ? "standard" : "all";
     const ranked = cloneTiles(candidates).map((tile) => {
       const trialPlayer = playerAfterDiscard(player, tile);
       return {
         tile,
+        afterDiscard: trialPlayer,
         shanten: estimateShantenByBasisCached(trialPlayer, context, basis),
         acceptance: countAcceptanceTilesAfterDiscard(player, tile, gameState, context, basis),
         edgePriority: edgeDiscardPriority(tile),
@@ -1096,8 +1138,16 @@
     const minShanten = Math.min(...ranked.map((entry) => entry.shanten));
     const shantenFiltered = ranked.filter((entry) => entry.shanten === minShanten);
     const maxAcceptance = Math.max(...shantenFiltered.map((entry) => entry.acceptance));
-    return shantenFiltered
-      .filter((entry) => entry.acceptance === maxAcceptance)
+    let bestEntries = shantenFiltered.filter((entry) => entry.acceptance === maxAcceptance);
+    if (useSecondStepAcceptance && bestEntries.length > 1) {
+      bestEntries = bestEntries.map((entry) => ({
+        ...entry,
+        secondStepAcceptance: secondStepAcceptanceScore(entry.afterDiscard, gameState, context, basis),
+      }));
+      const maxSecondStepAcceptance = Math.max(...bestEntries.map((entry) => entry.secondStepAcceptance));
+      bestEntries = bestEntries.filter((entry) => entry.secondStepAcceptance === maxSecondStepAcceptance);
+    }
+    return bestEntries
       .sort((left, right) => {
         if (left.edgePriority !== right.edgePriority) return left.edgePriority - right.edgePriority;
         if (left.doraPriority !== right.doraPriority) return left.doraPriority - right.doraPriority;
@@ -1110,7 +1160,7 @@
     if (candidates.length === 0) return null;
     const shantenInfo = estimateShantenInfoCached(player, context);
     const shantenBasis = shantenInfo.allShanten <= 1 ? "all" : "standard";
-    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis);
+    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, true);
   }
 
   function discardTilesOf(player) {
