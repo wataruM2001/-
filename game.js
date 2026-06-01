@@ -556,13 +556,22 @@
     return Math.max(-1, walk(counts, meldCount, 0, false));
   }
 
+  function chiitoitsuPairUnits(count) {
+    return Math.min(2, Math.floor(Math.max(0, Number(count) || 0) / 2));
+  }
+
+  function chiitoitsuUsableUnits(count) {
+    const safeCount = Math.max(0, Number(count) || 0);
+    return chiitoitsuPairUnits(safeCount) + (safeCount % 2 > 0 ? 1 : 0);
+  }
+
   function estimateChiitoitsuShanten(tiles = []) {
     const counts = countByBaseId(tiles);
     let pairUnits = 0;
     let usableUnits = 0;
     counts.forEach((count) => {
-      pairUnits += Math.floor(count / 2);
-      usableUnits += Math.floor(count / 2) + (count % 2 > 0 ? 1 : 0);
+      pairUnits += chiitoitsuPairUnits(count);
+      usableUnits += chiitoitsuUsableUnits(count);
     });
     return 6 - pairUnits + Math.max(0, 7 - usableUnits);
   }
