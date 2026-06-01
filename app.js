@@ -17,8 +17,8 @@
   const PAIFU_REPLAY_INTERVAL_MS = 1000;
   const PAIFU_STORAGE_KEY = "marchao-sanma-last-paifu-v1";
   const STATS_STORAGE_KEY = "marchaoSanmaStatsV1";
-  const IN_PROGRESS_STORAGE_KEY = "marchaoSanmaInProgressV2";
-  const LEGACY_IN_PROGRESS_STORAGE_KEYS = ["marchaoSanmaInProgressV1"];
+  const IN_PROGRESS_STORAGE_KEY = "marchaoSanmaInProgressV3";
+  const LEGACY_IN_PROGRESS_STORAGE_KEYS = ["marchaoSanmaInProgressV1", "marchaoSanmaInProgressV2"];
   const SOUND_SETTINGS_STORAGE_KEY = "marchaoSanmaSoundSettingsV1";
   const SOUND_FILE_VERSION = "sound-files-v112";
   const soundFile = (path) => `${path}?v=${SOUND_FILE_VERSION}`;
@@ -1352,10 +1352,18 @@
       console.info("[resume] localStorage read", raw ? "found" : "empty");
       const parsed = JSON.parse(raw || "null");
       console.info("[resume] JSON parse", parsed ? "success" : "empty");
-      if (!parsed || !parsed.battleState || parsed.completed) return null;
+      if (!parsed || !parsed.battleState || parsed.completed) {
+        if (parsed?.completed) localStorage.removeItem(IN_PROGRESS_STORAGE_KEY);
+        return null;
+      }
       return parsed;
     } catch (error) {
       console.error("[resume] JSON parse failed", error);
+      try {
+        localStorage.removeItem(IN_PROGRESS_STORAGE_KEY);
+      } catch (removeError) {
+        console.warn("[resume] failed to remove invalid save", removeError);
+      }
       return null;
     }
   }
