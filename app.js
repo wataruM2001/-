@@ -17,7 +17,8 @@
   const PAIFU_REPLAY_INTERVAL_MS = 1000;
   const PAIFU_STORAGE_KEY = "marchao-sanma-last-paifu-v1";
   const STATS_STORAGE_KEY = "marchaoSanmaStatsV1";
-  const IN_PROGRESS_STORAGE_KEY = "marchaoSanmaInProgressV1";
+  const IN_PROGRESS_STORAGE_KEY = "marchaoSanmaInProgressV2";
+  const LEGACY_IN_PROGRESS_STORAGE_KEYS = ["marchaoSanmaInProgressV1"];
   const SOUND_SETTINGS_STORAGE_KEY = "marchaoSanmaSoundSettingsV1";
   const SOUND_FILE_VERSION = "sound-files-v112";
   const soundFile = (path) => `${path}?v=${SOUND_FILE_VERSION}`;
@@ -347,6 +348,7 @@
 
   function init() {
     startTileImagePreload();
+    clearLegacyInProgressHanchanSaves();
     renderTileGroups();
     bindEvents();
     initializeAuth();
@@ -1362,8 +1364,19 @@
     return Boolean(loadInProgressHanchanSave());
   }
 
+  function clearLegacyInProgressHanchanSaves() {
+    LEGACY_IN_PROGRESS_STORAGE_KEYS.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (error) {
+        console.warn("[resume] failed to clear legacy save", key, error);
+      }
+    });
+  }
+
   function clearInProgressHanchanSave() {
     localStorage.removeItem(IN_PROGRESS_STORAGE_KEY);
+    clearLegacyInProgressHanchanSaves();
   }
 
   function normalizeHanchanTimingFields(gameState, fallbackStartedAt = "") {
