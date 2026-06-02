@@ -1170,14 +1170,16 @@
   }
 
   function chooseBestWithinSafeCategory(candidates, player, gameState, random = Math.random, context = null, shantenBasis = "all") {
-    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, true);
+    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, false);
   }
 
   function chooseStandardCpuDiscard(player, gameState, random = Math.random, context = null) {
     const candidates = discardCandidatesForPlayer(player, gameState);
     if (candidates.length === 0) return null;
+    const currentShantenInfo = estimateShantenInfoCached(player, context);
     const shantenBasis = cpuDiscardShantenBasis(player, context);
-    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, true);
+    const useSecondStepAcceptance = currentShantenInfo.allShanten === 1;
+    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, useSecondStepAcceptance);
   }
 
   function discardTilesOf(player) {
@@ -1491,7 +1493,7 @@
       return chooseUltraSpecialTieBreaker(childRiverTiles, player, gameState, random, context, shantenBasis);
     }
 
-    return chooseStandardCpuDiscard(player, gameState, random, context);
+    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, false);
   }
 
   function buildCpuPonVirtualPlayer(player, gameState, playerIndex, discardTile) {
