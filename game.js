@@ -127,7 +127,19 @@
       candidates: Array.isArray(pendingAction.candidates)
         ? pendingAction.candidates.map(cloneKanCandidate)
         : [],
+      ronCandidates: Array.isArray(pendingAction.ronCandidates)
+        ? pendingAction.ronCandidates.map(cloneRonCandidate)
+        : [],
     };
+  }
+
+  function cloneRonCandidate(candidate) {
+    return candidate
+      ? {
+          ...candidate,
+          winTile: cloneTile(candidate.winTile),
+        }
+      : null;
   }
 
   function cloneKanCandidate(candidate) {
@@ -2764,6 +2776,111 @@
     return syncDrawWallState(next);
   }
 
+  function ronCandidateEntries(gameState, discardTile, discarderIndex) {
+    return (gameState?.players || [])
+      .map((player, playerIndex) => {
+        const canWin = playerIndex !== discarderIndex && canRon(player, discardTile, gameState);
+        return {
+          player,
+          playerIndex,
+          playerId: player?.id || "",
+          isHuman: Boolean(player && !player.isCpu),
+          isCpu: Boolean(player?.isCpu),
+          winTile: cloneTile(discardTile),
+          winType: "ron",
+          canRon: canWin,
+        };
+      })
+      .filter((entry) => entry.canRon);
+  }
+
+  function ronBasisWinnerIndex(discarderIndex, winnerIndexes = []) {
+    const shimocha = ((Number(discarderIndex) || 0) + 1) % 3;
+    return winnerIndexes.includes(shimocha) ? shimocha : winnerIndexes[0] ?? null;
+  }
+
+  function orderedRonWinnerIndexes(discarderIndex, winnerIndexes = []) {
+    const unique = [...new Set(winnerIndexes.filter((index) => Number.isInteger(index)))];
+    const basis = ronBasisWinnerIndex(discarderIndex, unique);
+    if (!Number.isInteger(basis)) return unique;
+    return [basis, ...unique.filter((index) => index !== basis)];
+  }
+
+  function resolveRonCandidates(gameState, ronCandidates = [], { includeHuman = true } = {}) {
+    const initialWinners = ronCandidates
+      .filter((candidate) => includeHuman || candidate.isCpu)
+      .map((candidate) => candidate.playerIndex)
+      .filter((index) => Number.isInteger(index));
+    const discarderIndex = gameState?.lastAction?.playerIndex;
+    const discardTile = gameState?.lastAction?.tile || ronCandidates[0]?.winTile || null;
+    const winnerIndexes = orderedRonWinnerIndexes(discarderIndex, initialWinners);
+    if (winnerIndexes.length === 0) return gameState;
+    if (winnerIndexes.length === 1) {
+      return resolveWin(gameState, {
+        winType: "ron",
+        winnerIndex: winnerIndexes[0],
+        discarderIndex,
+        winningTile: discardTile,
+      });
+    }
+
+    const next = cloneGameState(gameState);
+    const originalHonba = Math.max(0, Math.floor(Number(next.honba) || 0));
+    const evaluationsByWinnerIndex = {};
+    const settlementsByWinnerIndex = {};
+    const aggregatePointDeltas = [0, 0, 0];
+    const aggregateChipDeltas = [0, 0, 0];
+
+    winnerIndexes.forEach((winnerIndex, orderIndex) => {
+      const evaluation = evaluateWin(next, {
+        winType: "ron",
+        winnerIndex,
+        winningTile: discardTile,
+      });
+      const restoreHonba = next.honba;
+      next.honba = orderIndex === 0 ? originalHonba : 0;
+      const settlement = applyWinSettlement(next, {
+        winType: "ron",
+        winnerIndex,
+        discarderIndex,
+        evaluation,
+      });
+      next.honba = restoreHonba;
+      evaluationsByWinnerIndex[winnerIndex] = evaluation;
+      settlementsByWinnerIndex[winnerIndex] = settlement;
+      settlement.pointDeltas.forEach((delta, index) => {
+        aggregatePointDeltas[index] += delta;
+      });
+      settlement.chipDeltas.forEach((delta, index) => {
+        aggregateChipDeltas[index] += delta;
+      });
+    });
+
+    next.phase = "result";
+    next.pendingAction = null;
+    next.pendingRiichi = null;
+    clearRiichiMarkerReplacementFlags(next);
+    next.lastAction = {
+      type: "win",
+      winType: "ron",
+      winnerIndexes,
+      winnerIndex: winnerIndexes[0],
+      discarderIndex,
+      winningTile: cloneTile(discardTile),
+      evaluation: evaluationsByWinnerIndex[winnerIndexes[0]],
+      evaluationsByWinnerIndex,
+      settlementsByWinnerIndex,
+      pointDeltas: aggregatePointDeltas,
+      chipDeltas: aggregateChipDeltas,
+      kyotakuBefore: Math.max(...winnerIndexes.map((index) => settlementsByWinnerIndex[index]?.kyotakuBefore || 0), 0),
+      kyotakuAfter: next.kyotaku,
+      paoState: next.paoState ? { ...next.paoState } : null,
+      effect: "繝ｭ繝ｳ",
+    };
+    next.lastEffect = next.lastAction.effect;
+    return syncDrawWallState(next);
+  }
+
   function resolveNagashiYakuman(gameState, winnerIndex) {
     const next = cloneGameState(gameState);
     const evaluation = nagashiYakumanEvaluation(next, winnerIndex);
@@ -2869,13 +2986,41 @@
       .map((player, playerIndex) => ({ player, playerIndex }))
       .filter(({ playerIndex }) => playerIndex !== discarderIndex);
 
-    const riichiRon = reactionPlayers.find(({ player }) => player.isRiichi && canRon(player, discardTile, next));
-    if (riichiRon) {
-      return resolveWin(next, {
-        winType: "ron",
-        winnerIndex: riichiRon.playerIndex,
+    const ronChecks = reactionPlayers.map(({ player, playerIndex }) => ({
+      playerId: player?.id || "",
+      playerIndex,
+      seat: player?.seat || "",
+      isCpu: Boolean(player?.isCpu),
+      canRon: canRon(player, discardTile, next),
+    }));
+    const ronCandidates = ronCandidateEntries(next, discardTile, discarderIndex);
+    if (ronCandidates.length > 0) {
+      const humanCanRon = ronCandidates.some((candidate) => candidate.isHuman);
+      console.log("Ron check", {
+        discarderId: next.players[discarderIndex]?.id || "",
         discarderIndex,
+        discardedTile: cloneTile(discardTile),
+        checks: ronChecks,
+        ronCandidates: ronCandidates.map((candidate) => ({
+          playerId: candidate.playerId,
+          playerIndex: candidate.playerIndex,
+          isHuman: candidate.isHuman,
+          isCpu: candidate.isCpu,
+        })),
+        humanCanRon,
       });
+      if (humanCanRon) {
+        return setPendingAction(next, {
+          playerId: ronCandidates.find((candidate) => candidate.isHuman)?.playerId || "",
+          playerIndex: ronCandidates.find((candidate) => candidate.isHuman)?.playerIndex ?? 0,
+          source: "afterDiscard",
+          discardTile,
+          availableActions: availableActionState({ ron: true, skip: true }),
+          candidates: [],
+          ronCandidates,
+        });
+      }
+      return resolveRonCandidates(next, ronCandidates, { includeHuman: false });
     }
 
     const humanReaction = reactionPlayers
@@ -2910,15 +3055,6 @@
       });
     }
 
-    const cpuRon = reactionPlayers.find(({ player }) => player.isCpu && canRon(player, discardTile, next));
-    if (cpuRon) {
-      return resolveWin(next, {
-        winType: "ron",
-        winnerIndex: cpuRon.playerIndex,
-        discarderIndex,
-      });
-    }
-
     const cpuPon = reactionPlayers
       .filter(({ player }) => player.isCpu)
       .map(({ player, playerIndex }) => ({
@@ -2944,6 +3080,9 @@
     const player = gameState.players[playerIndex];
 
     if (action === "ron" && pending.availableActions?.canRon) {
+      if (Array.isArray(pending.ronCandidates) && pending.ronCandidates.length > 0) {
+        return resolveRonCandidates(gameState, pending.ronCandidates, { includeHuman: true });
+      }
       return resolveWin(gameState, {
         winType: "ron",
         winnerIndex: playerIndex,
@@ -2971,6 +3110,9 @@
         return clearPendingAction(gameState, "discard");
       }
       if (pending.source === "afterDiscard") {
+        if (Array.isArray(pending.ronCandidates) && pending.ronCandidates.some((candidate) => candidate.isCpu)) {
+          return resolveRonCandidates(gameState, pending.ronCandidates, { includeHuman: false });
+        }
         let next = clearPendingAction(gameState, "draw");
         next = commitRiichiIfPending(next);
         next = nextTurn(next);
