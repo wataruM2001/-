@@ -2791,9 +2791,13 @@
 
   function buildWinDisplayInfo(gameState, winnerIndex, action, winnerIndexes = [winnerIndex]) {
     const winner = gameState.players[winnerIndex];
-    if (!winner || !action?.evaluation) return null;
+    const winnerEvaluation =
+      action?.evaluationsByWinnerIndex?.[winnerIndex] ??
+      action?.evaluationsByWinnerIndex?.[String(winnerIndex)] ??
+      action?.evaluation;
+    if (!winner || !winnerEvaluation) return null;
     const winningTile = action.winningTile || null;
-    const isRon = action.winType === "ron";
+    const isRon = action.winType === "ron" || (Array.isArray(action.winnerIndexes) && action.winnerIndexes.includes(winnerIndex));
     const handTiles = sortedBattleTiles(isRon
       ? [...(winner.hand || [])]
       : removeOneTileById(winner.hand || [], winningTile?.id));
@@ -2802,8 +2806,8 @@
       title: winDisplayTitle(winner),
       winType: action.winType,
       isRiichi: Boolean(winner.isRiichi),
-      yakuText: action.nagashiYakuman ? "役：流し役満" : formatWinYakuText(action.evaluation),
-      pointText: formatWinPointText(action.evaluation, action.winType),
+      yakuText: action.nagashiYakuman ? "役：流し役満" : formatWinYakuText(winnerEvaluation),
+      pointText: formatWinPointText(winnerEvaluation, action.winType),
       handTiles,
       winningTile,
       melds: winner.melds || [],
@@ -2966,7 +2970,13 @@
   function buildBattleHandResult(gameState) {
     const action = gameState.lastAction || {};
     const isRyukyoku = gameState.phase === "ryukyoku" || action.type === "ryukyoku";
-    const type = isRyukyoku ? "ryukyoku" : action.winType === "tsumo" ? "tsumo" : "ron";
+    const type = isRyukyoku
+      ? "ryukyoku"
+      : action.winType === "tsumo"
+        ? "tsumo"
+        : Array.isArray(action.winnerIndexes) && action.winnerIndexes.length > 1
+          ? "doubleRon"
+          : "ron";
     const winnerIndexes = battleResultWinnerIndexes(action);
     const winnerIds = winnerIndexes.map((index) => gameState.players[index]?.id).filter(Boolean);
     const pointDeltas = action.pointDeltas || [0, 0, 0];
