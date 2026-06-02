@@ -1182,7 +1182,7 @@
   }
 
   function chooseBestWithinSafeCategory(candidates, player, gameState, random = Math.random, context = null, shantenBasis = "all") {
-    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, false);
+    return chooseMaxAcceptanceDiscard(candidates, player, gameState, random, context, shantenBasis, true);
   }
 
   function chooseStandardCpuDiscard(player, gameState, random = Math.random, context = null) {
